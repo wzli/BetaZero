@@ -18,7 +18,7 @@ Borrowing from recent algorithms in Deep Rienforcement Learning (such as Deep Q-
 3. Use a Bayesian Based Neural Network archatecture to provide uncertainty estimates along with predictions
   * Pillar of stocastic based exploration algorithms is uncertainty estimates, to favor exploration of action of higher uncertainty
   * Allow for auto pruning of network archatecture and weights based on probability of hidden node being zero, also allows for reducing computational requirement for embedded applications.  
-..* Base on recent papers on either MC dropout or variational inference methods
+* Base on recent papers on either MC dropout or variational inference methods
 
 4. Directly approximate the Minimax tree of the game
   * minimax tree is the proven optimal algorithm for 2 player turn based games given enough resources, its a useful hueistic to embeded
