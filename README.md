@@ -4,7 +4,7 @@ An open source board game AI inspired by AlphaZero, with the goal of reaching su
 This project is still in progress ...
 
 ## The Plan:
-Borrowing from recent algorithms in Deep Rienforcement Learning (such as Deep Q-Network, Policy Gradient, Asynchronous Actor Critic), CNN (such as Inception Network) and Bayesian Neural Networks (such as the MC Dropout approximation), design an elegantly simple archatecture for the purpose of playing 2-play turned based board games.
+Build an elegantly simple archatecture for the purpose of playing competitive 2-player turned based board games by borrowing from recent algorithms in Deep Rienforcement Learning (such as Deep Q-Network, Policy Gradient, Asynchronous Actor Critic), CNN (such as Inception Network) and Bayesian Neural Networks (such as the MC Dropout approximation).
 
 1. There will be a single deep neural network to approximate the value function of an input game state
   * An additional policy/action model is omitted by design, given the assumption that the valid action space and state transitions for any given state is already known from provided game rules
