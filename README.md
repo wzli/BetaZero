@@ -9,7 +9,7 @@ Build an elegantly simple archatecture for the purpose of playing competitive 2-
 1. There will be a single deep neural network to approximate the value function of input game states
   * An additional policy/action model is omitted by design, given the assumption that the valid action space and state transitions for any given state is already known from provided game rules
   * Deciding on which action to take based on itterating through value predictions of each possible state transition is easily compuatable given the action space for boardgames are relatively small (>400 moves even for a large game like GO)
-  * Reduces complexity of problem and promotes reduces network redundancy assuming that large similarities shared from one state to the next
+  * Reduces complexity of problem and reduces network redundancy assuming that large similarities shared from one state to the next
   * Allow for more tractable mechanism of action/policy selection and hueistically directed value network updates.
 
 2. Combine Exploration and Explotation into a single process during Policy/Action selection
