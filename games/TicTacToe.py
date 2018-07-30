@@ -2,6 +2,8 @@
 
 import numpy as np
 
+input_dimentions = (3, 3, 2)
+
 win_masks = np.array([
 [
     [1, 1, 1],
@@ -63,6 +65,19 @@ def predict_action(state, action):
 def reduce_symetry(state):
     symetric_states = [state, np.flip(state, 0), np.flip(state, 1), np.rot90(state), np.rot90(np.rot90(state)), np.rot90(np.rot90(np.rot90(state)))]
     return symetric_states[np.argmax(np.array([symetric_state.tobytes() for symetric_state in symetric_states]))]
+
+def critical_actions(state):
+    critical = np.zeros(9, dtype=np.int8)
+    for i, value in np.ndenumerate(win_masks.dot(state.flat)):
+        if value == 2:
+            critical += win_masks[i] - state.flat * win_masks[i]
+        elif value == -2:
+            critical += -win_masks[i] - state.flat * win_masks[i]
+    return critical.reshape((3,3))
+
+def heuistic_filters(state):
+    state = reduce_symetry(state)
+    return np.array([state, critical_actions(state)])
 
 class Game:
     def __init(self):
