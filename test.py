@@ -19,10 +19,7 @@ agent.update_session(*session.do_action_index(1,1))
 
 agent.update_session(*session.do_action_index(2,0))
 
-#print(agent.state_history)
-#print(agent.action_prediction_history)
 #agent.update_session(*session.do_action_index(2,1))
-
 #pdfs = [pdf/np.sum(pdf) for pdf in pdfs]
 
 for i, pdf in enumerate(agent.pdfs):

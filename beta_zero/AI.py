@@ -18,7 +18,7 @@ class Agent:
         self.game = game
         self.value_model = game.Model()
         self.state_history = []
-        self.action_prediction_history = []
+        self.action_prediction_history = [None]
 
     def generate_predictions(self, state):
         action_predictions = list(zip(*self.game.generate_action_choices(state)))
@@ -37,26 +37,25 @@ class Agent:
 
     def update_session(self, state, value_pdf, reset_count):
         self.state_history.append(state)
-        self.action_prediction_history.append(self.generate_predictions(state))
-
-        if value_pdf is not None:
-            if reset_count > 0:
-                training_input_set = np.asarray([self.game.input_transform(input_state)
-                        for input_state in self.state_history[-reset_count:]])
+        if reset_count is 0:
+            self.action_prediction_history.append(self.generate_predictions(state))
+        else:
+            if value_pdf is not None:
+                training_input_set = [self.game.input_transform(input_state)
+                        for input_state in self.state_history[-reset_count:]]
                 training_target_set = [value_pdf]
                 for chosen_state, (_, state_transitions, _, _, value_pdfs) in zip(
-                        reversed(self.state_history[-reset_count:-1]),
-                        reversed(self.action_prediction_history[-reset_count-1:-2]
+                        reversed(self.state_history[-reset_count:]),
+                        reversed(self.action_prediction_history[-reset_count:]
                         )):
                     _, chosen_state_bytes = self.game.reduce_symetry(-chosen_state)
-                    state_transition_bytes = [state_transition.tobytes() for state_transition in state_transitions]
+                    state_transition_bytes = [state_transition.tobytes()
+                            for state_transition in state_transitions]
                     action_index = state_transition_bytes.index(chosen_state_bytes)
                     value_pdfs[action_index] = np.flip(training_target_set[-1])
                     training_target_set.append(max_pdf(value_pdfs))
                 training_target_set = reversed(training_target_set)
-
                 #TODO train
                 self.pdfs = training_target_set
-
                 self.state_history = self.state_history[:-reset_count]
-                self.action_prediction_history = self.action_prediction_history[:-reset_count]
+                self.action_prediction_history = self.action_prediction_history[:-reset_count+1]
