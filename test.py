@@ -3,11 +3,11 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-from betazero.ai import *
+from betazero.ai import Agent
 from betazero import tic_tac_toe as game
 
-agent = Agent(game)
 session = game.Session()
+agent = Agent(game)
 agent.update_session(*session.reset())
 agent.update_session(*session.do_action_index(0,0))
 agent.update_session(*session.do_action_index(0,1))

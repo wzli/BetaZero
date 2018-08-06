@@ -19,6 +19,4 @@ def one_hot_pdf(value, max_range, max_length):
     return pdf
 
 def sample_pdf(pdf):
-    sample = np.random.choice(pdf.shape, p=pdf)
-    return sample
-
+    return np.random.choice(pdf.shape, p=pdf)

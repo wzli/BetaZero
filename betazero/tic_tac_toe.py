@@ -100,7 +100,7 @@ def input_transform(state, reduce_symetry_enable = True):
     return np.array((reduced_state, critical_action_filter(reduced_state)))
 
 def generate_action_choices(state):
-    """Generate an iterator of tuples consisting of (action, state_transition, value, reset_count)
+    """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, value, reset_count)
     for every valid (symetry reduced) action from a given state
     """
     actions = {}
@@ -108,7 +108,7 @@ def generate_action_choices(state):
         state_transition, value, reset_count = predict_action(state, action)
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, reduced_state, value, reset_count]
+            actions[reduced_bytes] = [action, reduced_state, reduced_bytes, value, reset_count]
     return actions.values()
 
 class Session:
