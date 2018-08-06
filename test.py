@@ -3,8 +3,8 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 
-from beta_zero.AI import *
-from beta_zero import TicTacToe as game
+from betazero.ai import *
+from betazero import tic_tac_toe as game
 
 agent = Agent(game)
 session = game.Session()

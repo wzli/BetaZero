@@ -42,16 +42,6 @@ win_masks = np.array([
 ]], dtype=np.int8
 ).reshape(8, 3*3)
 
-def one_hot_pdf(value):
-    pdf = np.zeros(output_dimension)
-    value_index = round((output_dimension-1) * 0.5 * (1 + (value / max_value)))
-    pdf[value_index] = 1
-    return pdf
-
-def sample_pdf(pdf):
-    sample = np.random.choice(output_dimension, p=pdf)
-    return sample
-
 def action_index(i, j):
     """Returns the action encoding given an game board index."""
     action = np.zeros((3, 3), dtype=np.int8)
@@ -63,19 +53,19 @@ def get_actions(state):
     return (action_index(i,j) for (i, j), spot in np.ndenumerate(state) if spot == 0)
 
 def predict_action(state, action):
-    """Returns a tuple consisting of (state_transition, value_pdf, reset_count)."""
+    """Returns a tuple consisting of (state_transition, value, reset_count)."""
     # invalid action
     if np.dot(np.abs(action.flat), np.abs(state.flat)) != 0 or np.sum(np.abs(action)) != 1:
-        return (state, one_hot_pdf(-1), 1)
+        return (state, -1, 1)
     state_transition = state + action
     total_actions = np.count_nonzero(state_transition)
     # win condition
     if np.max(win_masks.dot(state_transition.flat)) == 3:
-        return (state_transition, one_hot_pdf(1), total_actions)
+        return (state_transition, 1, total_actions)
     # tie condition
     elif total_actions == 9:
-        return (state_transition, one_hot_pdf(0), 9)
-    # not an end condition, unknown value_pdf
+        return (state_transition, 0, 9)
+    # not an end condition, unknown value
     return (state_transition, None, 0)
 
 def reduce_symetry(state):
@@ -110,15 +100,15 @@ def input_transform(state, reduce_symetry_enable = True):
     return np.array((reduced_state, critical_action_filter(reduced_state)))
 
 def generate_action_choices(state):
-    """Generate an iterator of tuples consisting of (action, state_transition, value_pdf, reset_count)
+    """Generate an iterator of tuples consisting of (action, state_transition, value, reset_count)
     for every valid (symetry reduced) action from a given state
     """
     actions = {}
     for action in get_actions(state):
-        state_transition, value_pdf, reset_count = predict_action(state, action)
+        state_transition, value, reset_count = predict_action(state, action)
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, reduced_state, value_pdf, reset_count]
+            actions[reduced_bytes] = [action, reduced_state, value, reset_count]
     return actions.values()
 
 class Session:
@@ -130,12 +120,12 @@ class Session:
         return (self.state, None, 0)
 
     def do_action(self, action):
-        (state, value_pdf, reset_count) = predict_action(self.state, action)
+        (state, value, reset_count) = predict_action(self.state, action)
         if reset_count > 1:
             self.reset()
         else:
             self.state = -state
-        return (-state, value_pdf, reset_count)
+        return (-state, value, reset_count)
 
     def do_action_index(self, i, j):
         return self.do_action(action_index(i, j))
