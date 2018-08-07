@@ -19,7 +19,14 @@ def shift_pdf(pdf, value):
             shifted_pdf[shift_index:] = pdf[:-shift_index]
         elif shift_index < 0:
             shifted_pdf[:shift_index] = pdf[-shift_index:]
-        shifted_pdf = shifted_pdf/np.sum(shifted_pdf)
+        total = np.sum(shifted_pdf)
+        if total is 0:
+            if shift_index > 0:
+                shifted_pdf[-1] = 1
+            else:
+                shifted_pdf[0] = 1
+        else:
+            shifted_pdf = shifted_pdf/np.sum(shifted_pdf)
         return shifted_pdf
 
 def one_hot_pdf(value, max_length):
