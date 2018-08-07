@@ -1,8 +1,5 @@
 import numpy as np
 
-def gaussian(x, mu, sig):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
-
 def max_pdf(pdfs):
     pdfs = np.asarray(pdfs)
     cdfs = np.zeros((pdfs.shape[0], pdfs.shape[1] + 1))
@@ -12,11 +9,21 @@ def max_pdf(pdfs):
     max_pdf = max_pdf/np.sum(max_pdf)
     return max_pdf
 
-def one_hot_pdf(value, max_range, max_length):
+def shift_pdf(pdf, value):
+    shift_index = round((pdf.shape[0] - 1) * 0.5 * value)
+    if shift_index == 0:
+        return pdf
+    else:
+        shifted_pdf = np.zeros(pdf.shape)
+        if shift_index > 0:
+            shifted_pdf[shift_index:] = pdf[:-shift_index]
+        elif shift_index < 0:
+            shifted_pdf[:shift_index] = pdf[-shift_index:]
+        shifted_pdf = shifted_pdf/np.sum(shifted_pdf)
+        return shifted_pdf
+
+def one_hot_pdf(value, max_length):
     pdf = np.zeros(max_length)
-    value_index = round((max_length - 1) * 0.5 * (1 + (value / max_range)))
+    value_index = round((max_length - 1) * 0.5 * (1 + value))
     pdf[value_index] = 1
     return pdf
-
-def sample_pdf(pdf):
-    return np.random.choice(pdf.shape, p=pdf)

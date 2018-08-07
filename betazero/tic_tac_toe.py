@@ -3,8 +3,9 @@ import numpy as np
 import math
 
 input_dimensions = (3, 3, 2)
-output_dimension = 11
+output_dimension = 20
 max_value = 1
+min_max = True
 
 win_masks = np.array([
 [
@@ -53,7 +54,7 @@ def get_actions(state):
     return (action_index(i,j) for (i, j), spot in np.ndenumerate(state) if spot == 0)
 
 def predict_action(state, action):
-    """Returns a tuple consisting of (state_transition, value, reset_count)."""
+    """Returns a tuple consisting of (state_transition, reward, reset_count)."""
     # invalid action
     if np.dot(np.abs(action.flat), np.abs(state.flat)) != 0 or np.sum(np.abs(action)) != 1:
         return (state, -1, 1)
@@ -65,8 +66,8 @@ def predict_action(state, action):
     # tie condition
     elif total_actions == 9:
         return (state_transition, 0, 9)
-    # not an end condition, unknown value
-    return (state_transition, None, 0)
+    # not an end condition
+    return (state_transition, 0, 0)
 
 def reduce_symetry(state):
     """Map symetrically equivalent states to a unique state."""
@@ -100,15 +101,15 @@ def input_transform(state, reduce_symetry_enable = True):
     return np.array((reduced_state, critical_action_filter(reduced_state)))
 
 def generate_action_choices(state):
-    """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, value, reset_count)
+    """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, reward, reset_count)
     for every valid (symetry reduced) action from a given state
     """
     actions = {}
     for action in get_actions(state):
-        state_transition, value, reset_count = predict_action(state, action)
+        state_transition, reward, reset_count = predict_action(state, action)
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, reduced_state, reduced_bytes, value, reset_count]
+            actions[reduced_bytes] = [action, reduced_state, reduced_bytes, reward, reset_count]
     return actions.values()
 
 class Session:
@@ -117,15 +118,15 @@ class Session:
 
     def reset(self):
         self.state = np.zeros((3, 3), dtype=np.int8)
-        return (self.state, None, 0)
+        return (self.state, 0, 0)
 
     def do_action(self, action):
-        (state, value, reset_count) = predict_action(self.state, action)
+        (state, reward, reset_count) = predict_action(self.state, action)
         if reset_count > 1:
             self.reset()
         else:
             self.state = -state
-        return (-state, value, reset_count)
+        return (-state, reward, reset_count)
 
     def do_action_index(self, i, j):
         return self.do_action(action_index(i, j))
