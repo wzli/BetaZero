@@ -3,7 +3,7 @@ import numpy as np
 import math
 
 input_dimensions = (3, 3, 2)
-output_dimension = 20
+output_dimension = 24
 max_value = 1
 min_max = True
 

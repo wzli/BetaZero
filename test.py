@@ -13,18 +13,20 @@ agent.update_session(*session.do_action_index(0,0))
 agent.update_session(*session.do_action_index(0,1))
 agent.update_session(*session.do_action_index(1,0))
 agent.update_session(*session.do_action_index(1,1))
-
-#print(agent.action_prediction_history[-1])
-#print(agent.generate_action())
-
+agent.update_session(*session.do_action_index(0,2))
+agent.update_session(*session.do_action_index(1,2))
+agent.update_session(*session.do_action_index(2,2))
+print(agent.state_history[-1])
+print(agent.generate_action())
 agent.update_session(*session.do_action_index(2,0))
-
-#agent.update_session(*session.do_action_index(2,1))
-#pdfs = [pdf/np.sum(pdf) for pdf in pdfs]
+print(agent.state_history[-1])
+print(agent.generate_action())
+agent.update_session(*session.do_action_index(2,1))
+print(agent.state_history[-1])
+print(agent.generate_action())
 
 for i, pdf in enumerate(agent.pdfs):
     plt.plot(pdf, label = str(i))
-#plt.plot(support, max_pdf(pdfs), marker = "*")
 
 plt.legend()
 plt.show()

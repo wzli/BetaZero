@@ -18,7 +18,6 @@ def one_hot_pdf(value, length):
 def shift_pdf(pdf, value):
     shift_index = round((pdf.shape[0] - 1) * 0.5 * value)
     shift_index = value_to_shift_index(value, pdf.shape[0])
-    print(shift_index)
     if shift_index == 0:
         return pdf
     else:

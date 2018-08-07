@@ -11,6 +11,8 @@ class Agent:
 
     def generate_predictions(self, state):
         action_predictions = list(zip(*self.game.generate_action_choices(state)))
+        if not action_predictions:
+            return [()] * 6
         _, state_transitions, _, _, _ = action_predictions
         action_predictions.append([self.value_model.predict(self.game.input_transform(state_transition, False))
                         for state_transition in state_transitions])
@@ -21,18 +23,20 @@ class Agent:
             predictions = self.generate_predictions(state)
         else:
             predictions = self.action_prediction_history[-1]
-        actions, _, _, rewards, reset_counts, value_pdfs = prediction
-        value_samples = np.array((np.random.choice(pdf.shape, p=pdf) if reset_count == 0 else reward
-                for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)))
+        actions, _, _, rewards, reset_counts, value_pdfs = predictions
+        value_samples = np.array([np.random.choice(value_pdf.shape[0], p=value_pdf) if reset_count == 0 else reward
+                for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)])
+        if value_samples.shape[0] == 0:
+            return None
         return actions[np.argmax(value_samples)]
 
     def propagate_reward(self, steps, terminal_state = True):
         if steps < 1:
-            raise ValueError('step number < 1')
+            raise ValueError("step number < 1")
         training_input_set = (self.game.input_transform(input_state)
                 for input_state in self.state_history[-steps:])
         _, _, _, _, _, end_value_pdfs = self.action_prediction_history[-1]
-        if terminal_state:
+        if terminal_state or not end_value_pdfs:
             training_target_set = [one_hot_pdf(self.reward_history[-1] / self.game.max_value,
                     self.game.output_dimension)]
         else:
@@ -42,6 +46,8 @@ class Agent:
                 reversed(self.state_history[-steps+1:]),
                 reversed(self.reward_history[-steps:-1]),
                 reversed(self.action_prediction_history[-steps:-1])):
+            if not state_transitions:
+                raise ValueError("action prediction history has missing links")
             if self.game.min_max:
                 _, chosen_state_bytes = self.game.reduce_symetry(-chosen_state)
                 action_index = state_transition_bytes.index(chosen_state_bytes)
@@ -57,7 +63,7 @@ class Agent:
 
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:
-            raise ValueError('reset_count < 0')
+            raise ValueError("reset_count < 0")
         self.state_history.append(state)
         self.reward_history.append(reward)
         self.action_prediction_history.append(self.generate_predictions(state))
@@ -68,6 +74,8 @@ class Agent:
             self.reward_history = self.reward_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:-reset_count-1]
             self.action_prediction_history.append(self.generate_predictions(self.state_history[-1]))
+        elif not self.action_prediction_history[-1][0]:
+            raise ValueError("no more actions but game doesn't reset")
         elif reward != 0:
             #this is subjective
             self.propagate_reward(min(3, len(self.state_history)), False)
