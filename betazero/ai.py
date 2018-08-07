@@ -17,16 +17,18 @@ class Agent:
         return action_predictions
 
     def generate_action(self, state = None):
-        if state is None:
-            predictions = self.action_prediction_history[-1]
-        else:
+        if state:
             predictions = self.generate_predictions(state)
+        else:
+            predictions = self.action_prediction_history[-1]
         actions, _, _, rewards, reset_counts, value_pdfs = prediction
-        value_samples = np.array((np.random.choice(pdf.shape, p=pdf) if reset_count is 0 else reward
+        value_samples = np.array((np.random.choice(pdf.shape, p=pdf) if reset_count == 0 else reward
                 for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)))
         return actions[np.argmax(value_samples)]
 
     def propagate_reward(self, steps, terminal_state = True):
+        if steps < 1:
+            raise ValueError('step number < 1')
         training_input_set = (self.game.input_transform(input_state)
                 for input_state in self.state_history[-steps:])
         _, _, _, _, _, end_value_pdfs = self.action_prediction_history[-1]
@@ -54,17 +56,19 @@ class Agent:
         return (training_input_set, training_target_set)
 
     def update_session(self, state, reward, reset_count):
+        if reset_count < 0:
+            raise ValueError('reset_count < 0')
         self.state_history.append(state)
         self.reward_history.append(reward)
         self.action_prediction_history.append(self.generate_predictions(state))
-        if reset_count is not 0:
+        if reset_count != 0:
             self.inputs, self.pdfs = self.propagate_reward(reset_count)
                 #todo train model here
             self.state_history = self.state_history[:-reset_count]
             self.reward_history = self.reward_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:-reset_count-1]
             self.action_prediction_history.append(self.generate_predictions(self.state_history[-1]))
-        elif reward is not 0:
+        elif reward != 0:
             #this is subjective
             self.propagate_reward(min(3, len(self.state_history)), False)
             # train more

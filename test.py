@@ -1,8 +1,8 @@
 #usr/bin/python3
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 
+from betazero.utils import *
 from betazero.ai import Agent
 from betazero import tic_tac_toe as game
 
