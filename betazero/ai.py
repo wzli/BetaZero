@@ -60,8 +60,6 @@ class Agent:
                 reversed(self.action_prediction_history[-steps:-1])):
             if not state_transitions:
                 raise ValueError("action prediction history has missing links")
-            if self.game.min_max:
-               chosen_state = -chosen_state
             _, chosen_state_bytes = self.game.reduce_symetry(chosen_state)
             action_index = state_transition_bytes.index(chosen_state_bytes)
             value_pdfs[action_index] = training_target_set[-1]

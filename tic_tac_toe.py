@@ -40,7 +40,7 @@ else:
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
         if reset > 1:
-            print(state, "agent wins")
+            print(-state, "agent wins")
         agent.update_session(state, reward, reset)
         while True:
             print('\n', session.state)

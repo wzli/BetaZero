@@ -118,9 +118,9 @@ def generate_action_choices(state):
     actions = {}
     for action in get_actions(state):
         state_transition, reward, reset_count = predict_action(state, action)
-        reduced_state, reduced_bytes = reduce_symetry(state_transition)
+        reduced_state, reduced_bytes = reduce_symetry(-state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, reduced_state, reduced_bytes, reward, reset_count]
+            actions[reduced_bytes] = [action, -reduced_state, reduced_bytes, reward, reset_count]
     return actions.values()
 
 class Session:
