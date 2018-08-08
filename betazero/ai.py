@@ -14,8 +14,8 @@ class Agent:
         if not action_predictions:
             return [()] * 6
         _, state_transitions, _, _, _ = action_predictions
-        action_predictions.append(np.vstack([self.value_model.predict(self.game.input_transform(state_transition, False))
-                        for state_transition in state_transitions]))
+        action_predictions.append(self.value_model.predict(np.vstack(
+                [self.game.input_transform(state_transition, False) for state_transition in state_transitions])))
         return action_predictions
 
     def generate_action(self, state = None):
