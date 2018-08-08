@@ -28,7 +28,8 @@ class Agent:
                 for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)])
         if value_samples.shape[0] == 0:
             return None
-        return actions[np.argmax(value_samples)]
+        max_value_sample_indexes = np.argwhere(value_samples == np.amax(value_samples)).flat
+        return actions[np.random.choice(max_value_sample_indexes)]
 
     def propagate_reward(self, steps, terminal_state = True):
         if steps < 1:
