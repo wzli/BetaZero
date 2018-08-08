@@ -4,15 +4,15 @@ from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
 
 input_dimensions = (2, 3, 3)
-output_dimension = 33
+output_dimension = 3
 max_value = 1
 min_max = True
 
 def ValueModel():
     model = Sequential()
-    model.add(Conv2D(128, (3, 3), activation='relu', input_shape=input_dimensions, data_format="channels_first"))
+    model.add(Conv2D(64, (3, 3), activation='relu', input_shape=input_dimensions, data_format="channels_first"))
     model.add(Flatten())
-    model.add(Dense(64, activation='relu'))
+    model.add(Dense(32, activation='relu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
