@@ -134,6 +134,8 @@ class Session:
         (state, reward, reset_count) = predict_action(self.state, action)
         if reset_count > 1:
             self.reset()
+        elif reset_count == 1:
+            self.state = state
         else:
             self.state = -state
         return (-state, reward, reset_count)

@@ -1,13 +1,20 @@
 import numpy as np
+from keras.models import load_model
 from .utils import *
 
 class Agent:
-    def __init__(self, game):
+    def __init__(self, game, model):
         self.game = game
-        self.value_model = game.ValueModel()
+        try:
+            self.value_model = load_model(model)
+        except OSError:
+            print("Failed to load", model, "-> create new model")
+            self.value_model = game.ValueModel()
         self.state_history = []
         self.reward_history = []
         self.action_prediction_history = []
+        self.x_train = None
+        self.y_train = None
 
     def generate_predictions(self, state):
         action_predictions = list(zip(*self.game.generate_action_choices(state)))
@@ -31,7 +38,7 @@ class Agent:
         max_value_sample_indexes = np.argwhere(value_samples == np.amax(value_samples)).flat
         return actions[np.random.choice(max_value_sample_indexes)]
 
-    def propagate_reward(self, steps, terminal_state = True):
+    def generate_training_set(self, steps, terminal_state = True):
         if steps < 1:
             raise ValueError("step number < 1")
         training_input_set = (self.game.input_transform(input_state)
@@ -60,7 +67,7 @@ class Agent:
             value_update = shift_pdf(max_pdf(value_pdfs), reward / self.game.max_value)
             training_target_set.append(value_update)
         training_target_set = reversed(training_target_set)
-        return (training_input_set, training_target_set)
+        return (np.vstack(training_input_set), np.vstack(training_target_set))
 
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:
@@ -69,8 +76,8 @@ class Agent:
         self.reward_history.append(reward)
         self.action_prediction_history.append(self.generate_predictions(state))
         if reset_count != 0:
-            self.inputs, self.pdfs = self.propagate_reward(reset_count)
-                #todo train model here
+            self.x_train, self.y_train = self.generate_training_set(reset_count)
+            self.value_model.fit(self.x_train, self.y_train, verbose=0)
             self.state_history = self.state_history[:-reset_count]
             self.reward_history = self.reward_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:-reset_count-1]
@@ -78,6 +85,6 @@ class Agent:
         elif not self.action_prediction_history[-1][0]:
             raise ValueError("no more actions but game doesn't reset")
         elif reward != 0:
-            #self.propagate_reward(min(3, len(self.state_history)), False)
             # train more
+            #self.propagate_reward(min(3, len(self.state_history)), False)
             pass
