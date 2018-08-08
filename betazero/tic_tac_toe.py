@@ -10,9 +10,9 @@ min_max = True
 
 def ValueModel():
     model = Sequential()
-    model.add(Conv2D(64, (3, 3), activation='relu', input_shape=input_dimensions, data_format="channels_first"))
+    model.add(Conv2D(256, (3, 3), activation='selu', input_shape=input_dimensions, data_format="channels_first"))
     model.add(Flatten())
-    model.add(Dense(32, activation='relu'))
+    model.add(Dense(128, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
