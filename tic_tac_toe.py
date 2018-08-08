@@ -28,6 +28,12 @@ if args.self_train:
                 agent.value_model.save(args.model)
                 print("model saved, match", match_count)
                 save_count_down = args.save_interval
+                continue
+
+                for i, pdf in enumerate(agent.y_train):
+                    plt.plot(pdf, label = str(i))
+                plt.legend()
+                plt.show()
 else:
     while True:
         agent.update_session(state, reward, reset)
