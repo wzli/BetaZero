@@ -21,6 +21,8 @@ class Agent:
         if not action_predictions:
             return [()] * 6
         _, state_transitions, _, _, _ = action_predictions
+        if self.game.min_max:
+            state_transitions = [-state_transition for state_transition in state_transitions]
         action_predictions.append(self.value_model.predict(np.vstack(
                 [self.game.input_transform(state_transition, False) for state_transition in state_transitions])))
         return action_predictions
@@ -50,8 +52,8 @@ class Agent:
         else:
             training_target_set = [shift_pdf(max_pdf(end_value_pdfs),
                     self.reward_history[-1] / self.game.max_value)]
-            if self.game.min_max:
-                training_target_set[0] = np.flip(training_target_set[0])
+        if self.game.min_max:
+            training_target_set[0] = np.flip(training_target_set[0])
         for chosen_state, reward, (_, state_transitions, state_transition_bytes, _, _, value_pdfs) in zip(
                 reversed(self.state_history[-steps+1:]),
                 reversed(self.reward_history[-steps:-1]),
@@ -59,7 +61,7 @@ class Agent:
             if not state_transitions:
                 raise ValueError("action prediction history has missing links")
             if self.game.min_max:
-                chosen_state = -chosen_state
+               chosen_state = -chosen_state
             _, chosen_state_bytes = self.game.reduce_symetry(chosen_state)
             action_index = state_transition_bytes.index(chosen_state_bytes)
             value_pdfs[action_index] = training_target_set[-1]
@@ -73,6 +75,9 @@ class Agent:
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:
             raise ValueError("reset_count < 0")
+        if self.game.min_max:
+            state = -state
+            reward = -reward
         self.state_history.append(state)
         self.reward_history.append(reward)
         self.action_prediction_history.append(self.generate_predictions(state))
