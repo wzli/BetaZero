@@ -4,7 +4,7 @@ from .utils import *
 class Agent:
     def __init__(self, game):
         self.game = game
-        self.value_model = game.Model()
+        self.value_model = game.ValueModel()
         self.state_history = []
         self.reward_history = []
         self.action_prediction_history = []
@@ -14,8 +14,8 @@ class Agent:
         if not action_predictions:
             return [()] * 6
         _, state_transitions, _, _, _ = action_predictions
-        action_predictions.append([self.value_model.predict(self.game.input_transform(state_transition, False))
-                        for state_transition in state_transitions])
+        action_predictions.append(np.vstack([self.value_model.predict(self.game.input_transform(state_transition, False))
+                        for state_transition in state_transitions]))
         return action_predictions
 
     def generate_action(self, state = None):
@@ -77,6 +77,6 @@ class Agent:
         elif not self.action_prediction_history[-1][0]:
             raise ValueError("no more actions but game doesn't reset")
         elif reward != 0:
-            #this is subjective
-            self.propagate_reward(min(3, len(self.state_history)), False)
+            #self.propagate_reward(min(3, len(self.state_history)), False)
             # train more
+            pass

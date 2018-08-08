@@ -1,11 +1,21 @@
 #usr/bin/python3
 import numpy as np
-import math
+from keras.models import Sequential
+from keras.layers import Conv2D, Dense, Flatten
 
-input_dimensions = (3, 3, 2)
-output_dimension = 24
+input_dimensions = (2, 3, 3)
+output_dimension = 33
 max_value = 1
 min_max = True
+
+def ValueModel():
+    model = Sequential()
+    model.add(Conv2D(128, (3, 3), activation='relu', input_shape=input_dimensions, data_format="channels_first"))
+    model.add(Flatten())
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(output_dimension, activation='softmax'))
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    return model
 
 win_masks = np.array([
 [
@@ -98,7 +108,7 @@ def input_transform(state, reduce_symetry_enable = True):
         reduced_state, _ = reduce_symetry(state)
     else:
         reduced_state = state
-    return np.array((reduced_state, critical_action_filter(reduced_state)))
+    return np.array((reduced_state, critical_action_filter(reduced_state)))[np.newaxis]
 
 def generate_action_choices(state):
     """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, reward, reset_count)
@@ -130,13 +140,3 @@ class Session:
 
     def do_action_index(self, i, j):
         return self.do_action(action_index(i, j))
-
-class Model:
-    def __init__(self):
-        pass
-
-    def fit(self, x, y):
-        pass
-
-    def predict(self, x):
-        return np.ones(output_dimension)/output_dimension
