@@ -6,6 +6,7 @@ parser.add_argument('-m', '--model', default='model.h5', help='path to the hdf5 
 parser.add_argument('-i', '--save-interval', type=int, default=1000, help='save model every i matches')
 args = parser.parse_args()
 
+import timeit
 import numpy as np
 import matplotlib.pyplot as plt
 from betazero import ai, tic_tac_toe
@@ -17,6 +18,7 @@ state, reward, reset = session.reset()
 if args.self_train:
     match_count = 0
     save_count_down = args.save_interval
+    save_time = timeit.default_timer()
     while True:
         agent.update_session(state, reward, reset)
         action = agent.generate_action()
@@ -26,9 +28,12 @@ if args.self_train:
             save_count_down -= 1
             if save_count_down == 0:
                 agent.value_model.save(args.model)
-                print(agent.x_train)
-                print("model saved, match", match_count)
+                print("model saved at match", match_count)
+                print("time elapsed", timeit.default_timer() -save_time)
+                save_time = timeit.default_timer()
                 save_count_down = args.save_interval
+                for x, y in zip(agent.x_train, agent.y_train):
+                    print(x[0], np.around(y, decimals=2))
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
