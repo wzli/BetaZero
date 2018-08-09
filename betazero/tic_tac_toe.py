@@ -8,6 +8,7 @@ output_dimension = 3
 max_value = 1
 min_max = True
 
+
 def ValueModel():
     model = Sequential()
     model.add(Conv2D(512, (3, 3), activation='selu', input_shape=input_dimensions, data_format="channels_first"))
@@ -17,6 +18,7 @@ def ValueModel():
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
+
 
 win_masks = np.array([
 [
@@ -54,15 +56,18 @@ win_masks = np.array([
 ]], dtype=np.int8
 ).reshape(8, 3*3)
 
+
 def action_index(i, j):
     """Returns the action encoding given an game board index."""
     action = np.zeros((3, 3), dtype=np.int8)
     action[i][j] = 1
     return action
 
+
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     return (action_index(i,j) for (i, j), spot in np.ndenumerate(state) if spot == 0)
+
 
 def predict_action(state, action):
     """Returns a tuple consisting of (state_transition, reward, reset_count)."""
@@ -80,6 +85,18 @@ def predict_action(state, action):
     # not an end condition
     return (state_transition, 0, 0)
 
+
+def critical_action_filter(state):
+    """Generate a map of critical spots same dimension as input state"""
+    critical = np.zeros(9, dtype=np.int8)
+    for i, n_inline in np.ndenumerate(win_masks.dot(state.flat)):
+        if abs(n_inline) == 2:
+            critical += win_masks[i] - np.abs(state.flat * win_masks[i])
+        elif abs(n_inline) == 3:
+            critical += win_masks[i]
+    return critical.reshape((3,3))
+
+
 def reduce_symetry(state):
     """Map symetrically equivalent states to a unique state."""
     symetric_states = ((symetric_state, symetric_state.tobytes()) for symetric_state in
@@ -93,15 +110,6 @@ def reduce_symetry(state):
         ))
     return max(symetric_states, key = lambda x: x[1])
 
-def critical_action_filter(state):
-    """Generate a map of critical spots same dimension as input state"""
-    critical = np.zeros(9, dtype=np.int8)
-    for i, n_inline in np.ndenumerate(win_masks.dot(state.flat)):
-        if abs(n_inline) == 2:
-            critical += win_masks[i] - np.abs(state.flat * win_masks[i])
-        elif abs(n_inline) == 3:
-            critical += win_masks[i]
-    return critical.reshape((3,3))
 
 def input_transform(state, reduce_symetry_enable = True):
     """Transform an input state to an input format the model requires"""
@@ -110,6 +118,7 @@ def input_transform(state, reduce_symetry_enable = True):
     else:
         reduced_state = state
     return np.array((reduced_state, critical_action_filter(reduced_state)))[np.newaxis]
+
 
 def generate_action_choices(state):
     """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, reward, reset_count)
@@ -122,6 +131,7 @@ def generate_action_choices(state):
         if reduced_bytes not in actions:
             actions[reduced_bytes] = [action, -reduced_state, reduced_bytes, reward, reset_count]
     return actions.values()
+
 
 class Session:
     def __init__(self):
