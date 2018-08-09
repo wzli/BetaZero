@@ -45,8 +45,8 @@ if args.self_train:
 else:
     while True:
         agent.update_session(state, reward, reset)
-        for action_prediction in zip(*agent.action_prediction_history[-1]):
-            print(action_prediction)
+        for action, _, _, action_reward, _, value_pdf in zip(*agent.action_prediction_history[-1]):
+            print(action, action_reward, value_pdf)
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
         if reset > 1:
