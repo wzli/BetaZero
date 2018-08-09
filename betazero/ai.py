@@ -54,7 +54,7 @@ class Agent:
             training_target_set = [shift_pdf(max_pdf(end_value_pdfs),
                     self.reward_history[-1] / self.game.max_value)]
         if self.game.min_max:
-            training_target_set[0] = np.flip(training_target_set[0])
+            training_target_set[0] = np.flip(training_target_set[0], axis=0)
         for chosen_state, reward, (_, state_transitions, state_transition_bytes, _, _, value_pdfs) in zip(
                 reversed(self.state_history[-steps+1:]),
                 reversed(self.reward_history[-steps:-1]),
@@ -66,7 +66,7 @@ class Agent:
             value_pdfs[action_index] = training_target_set[-1]
             value_update = shift_pdf(max_pdf(value_pdfs), reward / self.game.max_value)
             if self.game.min_max:
-                value_update = np.flip(value_update)
+                value_update = np.flip(value_update, axis=0)
             training_target_set.append(value_update)
         training_target_set = reversed(training_target_set)
         return (np.vstack(training_input_set), np.vstack(training_target_set))
