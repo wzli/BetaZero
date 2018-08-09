@@ -11,6 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from betazero import ai, tic_tac_toe
 
+np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+
 agent = ai.Agent(tic_tac_toe, args.model)
 session = tic_tac_toe.Session()
 state, reward, reset = session.reset()
@@ -33,7 +35,7 @@ if args.self_train:
                 save_time = timeit.default_timer()
                 save_count_down = args.save_interval
                 for x, y in zip(agent.x_train, agent.y_train):
-                    print(x[0], np.around(y, decimals=2))
+                    print(x[0], y)
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
@@ -43,6 +45,8 @@ if args.self_train:
 else:
     while True:
         agent.update_session(state, reward, reset)
+        for action_prediction in zip(*agent.action_prediction_history[-1]):
+            print(action_prediction)
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
         if reset > 1:
@@ -61,10 +65,9 @@ else:
             if len(move_index) != 2:
                 print("invalid index dimension")
                 continue
-            for index in move_index:
-                if index > 2 or index < 0:
-                    print("invalid index range")
-                    continue
+            if max(move_index) > 2 or min(move_index) < 0:
+                print("invalid index range")
+                continue
             state, reward, reset = session.do_action_index(*move_index)
             if reset == 1:
                 print("already occupied")

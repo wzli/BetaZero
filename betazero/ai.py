@@ -18,11 +18,11 @@ class Agent:
 
     def generate_predictions(self, state):
         action_predictions = list(zip(*self.game.generate_action_choices(state)))
+        if self.game.min_max:
+            action_predictions[1] = [-state_transition for state_transition in action_predictions[1]]
         if not action_predictions:
             return [()] * 6
         _, state_transitions, _, _, _ = action_predictions
-        if self.game.min_max:
-            state_transitions = [-state_transition for state_transition in state_transitions]
         action_predictions.append(self.value_model.predict(np.vstack(
                 [self.game.input_transform(state_transition, False) for state_transition in state_transitions])))
         return action_predictions
@@ -55,11 +55,11 @@ class Agent:
                     self.reward_history[-1] / self.game.max_value)]
         if self.game.min_max:
             training_target_set[0] = np.flip(training_target_set[0], axis=0)
-        for chosen_state, reward, (_, state_transitions, state_transition_bytes, _, _, value_pdfs) in zip(
+        for chosen_state, reward, (_, _, state_transition_bytes, _, _, value_pdfs) in zip(
                 reversed(self.state_history[-steps+1:]),
                 reversed(self.reward_history[-steps:-1]),
                 reversed(self.action_prediction_history[-steps:-1])):
-            if not state_transitions:
+            if not state_transition_bytes:
                 raise ValueError("action prediction history has missing links")
             _, chosen_state_bytes = self.game.reduce_symetry(chosen_state)
             action_index = state_transition_bytes.index(chosen_state_bytes)
