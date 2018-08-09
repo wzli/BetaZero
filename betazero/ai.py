@@ -18,10 +18,10 @@ class Agent:
 
     def generate_predictions(self, state):
         action_predictions = list(zip(*self.game.generate_action_choices(state)))
-        if self.game.min_max:
-            action_predictions[1] = [-state_transition for state_transition in action_predictions[1]]
         if not action_predictions:
             return [()] * 6
+        if self.game.min_max:
+            action_predictions[1] = [-state_transition for state_transition in action_predictions[1]]
         _, state_transitions, _, _, _ = action_predictions
         action_predictions.append(self.value_model.predict(np.vstack(
                 [self.game.input_transform(state_transition, False) for state_transition in state_transitions])))
