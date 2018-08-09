@@ -33,8 +33,9 @@ class Agent:
         else:
             predictions = self.action_prediction_history[-1]
         actions, _, _, rewards, reset_counts, value_pdfs = predictions
-        value_samples = np.array([np.random.choice(value_pdf.shape[0], p=value_pdf) if reset_count == 0 else reward
-                for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)])
+        value_samples = np.array([np.random.choice(value_pdf.shape[0], p=value_pdf)
+                if reset_count == 0 else value_to_index(reward/self.game.max_value, self.game.output_dimension)
+                        for value_pdf, reward, reset_count in zip(value_pdfs, rewards, reset_counts)])
         if value_samples.shape[0] == 0:
             return None
         max_value_sample_indexes = np.argwhere(value_samples == np.amax(value_samples)).flat

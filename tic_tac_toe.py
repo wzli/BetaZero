@@ -26,6 +26,7 @@ if args.self_train:
             save_count_down -= 1
             if save_count_down == 0:
                 agent.value_model.save(args.model)
+                print(agent.x_train)
                 print("model saved, match", match_count)
                 save_count_down = args.save_interval
                 continue
