@@ -98,10 +98,9 @@ def critical_action_filter(state):
 
 def reduce_symetry(state):
     """Map symetrically equivalent states to a unique state."""
-    symetric_states = [state]
-    for i in range(3):
-        symetric_states.append(np.rot90(symetric_states[-1]))
+    symetric_states = [state, np.rot90(state)]
     symetric_states.extend([np.flip(symetric_state, 0) for symetric_state in symetric_states])
+    symetric_states.extend([np.flip(symetric_state, 1) for symetric_state in symetric_states])
     byte_representations = (symetric_state.tobytes() for symetric_state in symetric_states)
     return max(zip(symetric_states, byte_representations), key = lambda x: x[1])
 
