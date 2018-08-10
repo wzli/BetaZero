@@ -36,6 +36,7 @@ if args.self_train:
                 save_count_down = args.save_interval
                 for x, y in zip(agent.x_train, agent.y_train):
                     print(x[0], y)
+                #break
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
@@ -68,7 +69,7 @@ else:
             if max(move_index) > 2 or min(move_index) < 0:
                 print("invalid index range")
                 continue
-            state, reward, reset = session.do_action_index(*move_index)
+            state, reward, reset = session.do_action(move_index)
             if reset == 1:
                 print("already occupied")
                 continue

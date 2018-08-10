@@ -56,24 +56,20 @@ win_masks = np.array([
 ).reshape(8, 3*3)
 
 
-def action_index(i, j):
-    """Returns the action encoding given an game board index."""
-    action = np.zeros((3, 3), dtype=np.int8)
-    action[i][j] = 1
-    return action
-
-
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    return (action_index(i,j) for (i, j), spot in np.ndenumerate(state) if spot == 0)
+    return (action for action, spot in np.ndenumerate(state) if spot == 0)
 
 
 def predict_action(state, action):
     """Returns a tuple consisting of (state_transition, reward, reset_count)."""
+    # make buffer
+    state_transition = np.copy(state)
     # invalid action
-    if np.dot(np.abs(action.flat), np.abs(state.flat)) != 0 or np.sum(np.abs(action)) != 1:
-        return (state, -1, 1)
-    state_transition = state + action
+    if state_transition[action[0], action[1]] != 0:
+        return (state_transition, -1, 1)
+
+    state_transition[action[0], action[1]] = 1
     total_actions = np.count_nonzero(state_transition)
     # win condition
     if np.max(win_masks.dot(state_transition.flat)) == 3:
@@ -144,6 +140,3 @@ class Session:
         else:
             self.state = -state
         return (state, reward, reset_count)
-
-    def do_action_index(self, i, j):
-        return self.do_action(action_index(i, j))
