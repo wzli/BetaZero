@@ -65,11 +65,12 @@ def predict_action(state, action):
     """Returns a tuple consisting of (state_transition, reward, reset_count)."""
     # make buffer
     state_transition = np.copy(state)
+    action = tuple(action)
     # invalid action
-    if state_transition[action[0], action[1]] != 0:
+    if state_transition[action] != 0:
         return state_transition, -1, 1
     # apply action
-    state_transition[action[0], action[1]] = 1
+    state_transition[action] = 1
     total_actions = np.count_nonzero(state_transition)
     # win condition
     if np.max(win_masks.dot(state_transition.flat)) == 3:
