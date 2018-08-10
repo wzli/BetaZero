@@ -1,9 +1,16 @@
 #usr/bin/python3
 import argparse
 parser = argparse.ArgumentParser(description='BetaZero TicTacToe App')
-parser.add_argument('-s', '--self-train', action="store_true", help='self training mode')
-parser.add_argument('-m', '--model', default='model.h5', help='path to the hdf5 model file')
-parser.add_argument('-i', '--save-interval', type=int, default=1000, help='save model every i matches')
+parser.add_argument(
+    '-s', '--self-train', action="store_true", help='self training mode')
+parser.add_argument(
+    '-m', '--model', default='model.h5', help='path to the hdf5 model file')
+parser.add_argument(
+    '-i',
+    '--save-interval',
+    type=int,
+    default=1000,
+    help='save model every i matches')
 args = parser.parse_args()
 
 import timeit
@@ -31,7 +38,7 @@ if args.self_train:
             if save_count_down == 0:
                 agent.value_model.save(args.model)
                 print("model saved at match", match_count)
-                print("time elapsed", timeit.default_timer() -save_time)
+                print("time elapsed", timeit.default_timer() - save_time)
                 save_time = timeit.default_timer()
                 save_count_down = args.save_interval
                 for x, y in zip(agent.x_train, agent.y_train):
@@ -39,7 +46,7 @@ if args.self_train:
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
-                    plt.plot(pdf, label = str(i))
+                    plt.plot(pdf, label=str(i))
                 plt.legend()
                 plt.show()
 else:
@@ -47,7 +54,8 @@ else:
         agent.update_session(state, reward, reset)
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
-        for action, _, action_reward, _, value_pdf, value_sample in zip(*agent.action_prediction_history[-1], agent.value_samples):
+        for action, _, action_reward, _, value_pdf, value_sample in zip(
+                *agent.action_prediction_history[-1], agent.value_samples):
             print(action, action_reward, value_pdf, value_sample)
         if reset > 1:
             if reward > 0:
@@ -58,7 +66,10 @@ else:
         while True:
             print('\n', session.state)
             try:
-                move_index = [int(token) - 1 for token in input('your turn, enter "row col": ').split(' ')]
+                move_index = [
+                    int(token) - 1 for token in input(
+                        'your turn, enter "row col": ').split(' ')
+                ]
             except ValueError:
                 print("integer parsing error")
                 continue

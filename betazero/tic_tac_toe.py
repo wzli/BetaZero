@@ -11,7 +11,12 @@ min_max = True
 
 def ValueModel():
     model = Sequential()
-    model.add(Conv2D(16, (3, 3), activation='selu', input_shape=input_dimensions, data_format="channels_first"))
+    model.add(
+        Conv2D(
+            16, (3, 3),
+            activation='selu',
+            input_shape=input_dimensions,
+            data_format="channels_first"))
     model.add(Flatten())
     model.add(Dense(8, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
@@ -19,41 +24,41 @@ def ValueModel():
     return model
 
 
-win_masks = np.array([
-[
-    [1, 1, 1],
-    [0, 0, 0],
-    [0, 0, 0],
-],[
-    [0, 0, 0],
-    [1, 1, 1],
-    [0, 0, 0],
-],[
-    [0, 0, 0],
-    [0, 0, 0],
-    [1, 1, 1],
-],[
-    [1, 0, 0],
-    [1, 0, 0],
-    [1, 0, 0],
-],[
-    [0, 1, 0],
-    [0, 1, 0],
-    [0, 1, 0],
-],[
-    [0, 0, 1],
-    [0, 0, 1],
-    [0, 0, 1],
-],[
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-],[
-    [0, 0, 1],
-    [0, 1, 0],
-    [1, 0, 0],
-]], dtype=np.int8
-).reshape(8, 3*3)
+win_masks = np.array(
+    [[
+        [1, 1, 1],
+        [0, 0, 0],
+        [0, 0, 0],
+    ], [
+        [0, 0, 0],
+        [1, 1, 1],
+        [0, 0, 0],
+    ], [
+        [0, 0, 0],
+        [0, 0, 0],
+        [1, 1, 1],
+    ], [
+        [1, 0, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+    ], [
+        [0, 1, 0],
+        [0, 1, 0],
+        [0, 1, 0],
+    ], [
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+    ], [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+    ], [
+        [0, 0, 1],
+        [0, 1, 0],
+        [1, 0, 0],
+    ]],
+    dtype=np.int8).reshape(8, 3 * 3)
 
 
 def get_actions(state):
@@ -90,22 +95,27 @@ def critical_action_filter(state):
             critical += win_masks[i] - np.abs(state.flat * win_masks[i])
         elif abs(n_inline) == 3:
             critical += win_masks[i]
-    return critical.reshape((3,3))
+    return critical.reshape((3, 3))
 
 
 def reduce_symetry(state):
     """Map symetrically equivalent states to a unique state."""
     symetric_states = [state, np.rot90(state)]
-    symetric_states.extend([np.flip(symetric_state, 0) for symetric_state in symetric_states])
-    symetric_states.extend([np.flip(symetric_state, 1) for symetric_state in symetric_states])
-    byte_representations = (symetric_state.tobytes() for symetric_state in symetric_states)
-    return max(zip(symetric_states, byte_representations), key = lambda x: x[1])
+    symetric_states.extend(
+        [np.flip(symetric_state, 0) for symetric_state in symetric_states])
+    symetric_states.extend(
+        [np.flip(symetric_state, 1) for symetric_state in symetric_states])
+    byte_representations = (symetric_state.tobytes()
+                            for symetric_state in symetric_states)
+    return max(zip(symetric_states, byte_representations), key=lambda x: x[1])
 
 
-def input_transform(state, reduce_symetry_enable = True):
+def input_transform(state, reduce_symetry_enable=True):
     """Transform an input state to an input format the model requires"""
-    reduced_state = reduce_symetry(state)[0] if reduce_symetry_enable else state
-    return np.array((reduced_state, critical_action_filter(reduced_state)))[np.newaxis]
+    reduced_state = reduce_symetry(state)[
+        0] if reduce_symetry_enable else state
+    return np.array((reduced_state,
+                     critical_action_filter(reduced_state)))[np.newaxis]
 
 
 def generate_action_choices(state):
@@ -117,7 +127,9 @@ def generate_action_choices(state):
         state_transition, reward, reset_count = predict_action(state, action)
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, reduced_state, reward, reset_count]
+            actions[reduced_bytes] = [
+                action, reduced_state, reward, reset_count
+            ]
     return actions
 
 
