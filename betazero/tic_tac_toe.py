@@ -11,10 +11,9 @@ min_max = True
 
 def ValueModel():
     model = Sequential()
-    model.add(Conv2D(512, (3, 3), activation='selu', input_shape=input_dimensions, data_format="channels_first"))
+    model.add(Conv2D(16, (3, 3), activation='selu', input_shape=input_dimensions, data_format="channels_first"))
     model.add(Flatten())
-    model.add(Dense(256, activation='selu'))
-    model.add(Dense(128, activation='selu'))
+    model.add(Dense(8, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
@@ -99,16 +98,12 @@ def critical_action_filter(state):
 
 def reduce_symetry(state):
     """Map symetrically equivalent states to a unique state."""
-    symetric_states = ((symetric_state, symetric_state.tobytes()) for symetric_state in
-        (
-            state,
-            np.flip(state, 0),
-            np.flip(state, 1),
-            np.rot90(state),
-            np.rot90(np.flip(state, 0)),
-            np.rot90(np.rot90(state))
-        ))
-    return max(symetric_states, key = lambda x: x[1])
+    symetric_states = [state]
+    for i in range(3):
+        symetric_states.append(np.rot90(symetric_states[-1]))
+    symetric_states.extend([np.flip(symetric_state, 0) for symetric_state in symetric_states])
+    byte_representations = (symetric_state.tobytes() for symetric_state in symetric_states)
+    return max(zip(symetric_states, byte_representations), key = lambda x: x[1])
 
 
 def input_transform(state, reduce_symetry_enable = True):
