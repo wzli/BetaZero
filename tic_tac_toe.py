@@ -36,7 +36,6 @@ if args.self_train:
                 save_count_down = args.save_interval
                 for x, y in zip(agent.x_train, agent.y_train):
                     print(x[0], y)
-                #break
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
@@ -46,10 +45,10 @@ if args.self_train:
 else:
     while True:
         agent.update_session(state, reward, reset)
-        for action, _, _, action_reward, _, value_pdf in zip(*agent.action_prediction_history[-1]):
-            print(action, action_reward, value_pdf)
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
+        for action, _, action_reward, _, value_pdf, value_sample in zip(*agent.action_prediction_history[-1], agent.value_samples):
+            print(action, action_reward, value_pdf, value_sample)
         if reset > 1:
             if reward > 0:
                 print(-state, "agent wins")

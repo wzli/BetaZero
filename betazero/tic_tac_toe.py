@@ -67,18 +67,18 @@ def predict_action(state, action):
     state_transition = np.copy(state)
     # invalid action
     if state_transition[action[0], action[1]] != 0:
-        return (state_transition, -1, 1)
-
+        return state_transition, -1, 1
+    # apply action
     state_transition[action[0], action[1]] = 1
     total_actions = np.count_nonzero(state_transition)
     # win condition
     if np.max(win_masks.dot(state_transition.flat)) == 3:
-        return (state_transition, 1, total_actions)
+        return state_transition, 1, total_actions
     # tie condition
     elif total_actions == 9:
-        return (state_transition, 0, 9)
+        return state_transition, 0, 9
     # not an end condition
-    return (state_transition, 0, 0)
+    return state_transition, 0, 0
 
 
 def critical_action_filter(state):
@@ -103,10 +103,7 @@ def reduce_symetry(state):
 
 def input_transform(state, reduce_symetry_enable = True):
     """Transform an input state to an input format the model requires"""
-    if reduce_symetry_enable:
-        reduced_state, _ = reduce_symetry(state)
-    else:
-        reduced_state = state
+    reduced_state = reduce_symetry(state)[0] if reduce_symetry_enable else state
     return np.array((reduced_state, critical_action_filter(reduced_state)))[np.newaxis]
 
 
@@ -117,10 +114,10 @@ def generate_action_choices(state):
     actions = {}
     for action in get_actions(state):
         state_transition, reward, reset_count = predict_action(state, action)
-        reduced_state, reduced_bytes = reduce_symetry(-state_transition)
+        reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
-            actions[reduced_bytes] = [action, -reduced_state, reduced_bytes, reward, reset_count]
-    return actions.values()
+            actions[reduced_bytes] = [action, reduced_state, reward, reset_count]
+    return actions
 
 
 class Session:
@@ -129,14 +126,14 @@ class Session:
 
     def reset(self):
         self.state = np.zeros((3, 3), dtype=np.int8)
-        return (self.state, 0, 0)
+        return self.state, 0, 0
 
     def do_action(self, action):
         (state, reward, reset_count) = predict_action(self.state, action)
-        if reset_count > 1:
-            self.reset()
+        if reset_count == 0:
+            self.state = -state
         elif reset_count == 1:
             self.state = state
         else:
-            self.state = -state
-        return (state, reward, reset_count)
+            self.reset()
+        return state, reward, reset_count
