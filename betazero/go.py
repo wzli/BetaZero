@@ -47,7 +47,6 @@ class State:
         self.board = np.zeros(board_size, dtype=np.int8)
         self.group_lookup = np.empty(board_size, dtype=object)
         self.capture_spots = (None, set(), set())
-        self.suicide_spots = (None, set(), set())
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
@@ -72,34 +71,49 @@ class State:
         return board
 
 
-    def is_suicide(self, stone, perspective):
+    def is_suicide(self, stone, perspective = None):
+        if not perspective:
+            perspective = self.perspective
+        # iterate adjacent stones
         for adjacent_spot in get_adjacent(stone):
-            if (self.board[adjacent_spot] == 0
-                or (self.board[adjacent_spot] == perspective
-                    and len(self.group_lookup[adjacent_spot].liberties) > 1)
-                or (self.board[adjacent_spot] == -perspective)
+            # creates liberty, not suicide
+            if self.board[adjacent_spot] == 0:
+                return False
+            # if any adjacent friendly group has more than one liberty, not suicide
+            if (self.board[adjacent_spot] == perspective
+                    and len(self.group_lookup[adjacent_spot].liberties) > 1):
+                return False
+            # if any adjacent enemy group can be captured, not suicide
+            if (self.board[adjacent_spot] == -perspective
                     and len(self.group_lookup[adjacent_spot].liberties) == 1):
                 return False
+        # fails checks, is suicide
+        print("no suicide")
         return True
 
 
-    def is_invalid(self, stone, perspective):
+    def is_invalid(self, stone, perspective = None):
+        if not perspective:
+            perspective = self.perspective
         # out of bounds, already occupied, ko, or suicidal moves
         if (not within_bounds(stone)
                 or self.board[stone] != 0
                 or stone == self.ko
-                or stone in self.suicide_spots[perspective]):
-            print("Invalid Move")
+                or self.is_suicide(stone, perspective)):
+            print("is invalid")
             return True
         return False
 
-    def place_stone(self, stone, perspective):
+    def place_stone(self, stone, perspective = None):
+        if not perspective:
+            perspective = self.perspective
         if self.is_invalid(stone, perspective):
             return
         # create stone group with a single stone
         group = StoneGroup(stone)
         self.group_lookup[stone] = group
         self.board[stone] = perspective
+        # only the adjacent spots of affected
         for adjacent_spot in get_adjacent(stone):
             # if there is an adjacent enemy
             if self.board[adjacent_spot] == -perspective:
@@ -107,36 +121,29 @@ class State:
                 enemy_group = self.group_lookup[adjacent_spot]
                 # remove a liberty from their stone group
                 enemy_group.liberties.remove(stone)
-                # if no more liberties left, capture
+                # if no more liberties left capture enemy
                 if not enemy_group.liberties:
-                    for captured in enemy_group.stones:
-                        self.board[captured] = 0
-                        self.group_lookup[captured] = None
-                        # add liberties back to friendly groups from the released captured spots
-                        for released in get_adjacent(captured):
-                            if self.board[released] == perspective:
-                                self.group_lookup[released].liberties.add(captured)
-                    # the only way to remove suicide spots is to capture enemy
-                    for suicide_spot in self.suicide_spots[perspective]:
-                        if not is_suicide(suicide_spot):
-                            self.suicide_spots[perspective].remove(suicide_spot)
-                    for capture_spot in self.capture_spots[perspective]:
-                        for adjacent_spot in get_adjacent(capture_spot):
-                            if len(self.group_lookup[adjacent_spot].liberties) > 1:
-                                self.capture_spots[perspective].remove(suicide_spot)
-                    # already captured, remove the capture spot
+                    # remove the capture spot from list
                     self.capture_spots[-perspective].discard(stone)
-                    self.suicide_spots[-perspective].discard(stone)
+                    # recode ko if only one piece was taken
                     if len(enemy_group.stones) == 1:
                         self.ko = next(iter(enemy_group.stones))
                     else:
                         self.ko = None
+                    # remove peices
+                    for captured in enemy_group.stones:
+                        self.board[captured] = 0
+                        self.group_lookup[captured] = None
+                        # add liberties back to surrounding friendly groups
+                        for released in get_adjacent(captured):
+                            if self.board[released] == perspective:
+                                released_group = self.group_lookup[released]
+                                if len(released_group.liberties) == 1:
+                                   self.capture_spots[perspective].discard(next(iter(released_group.liberties)))
+                                released_group.liberties.add(captured)
                 # if one liberty left, add to capture spots
                 elif len(enemy_group.liberties) == 1:
                     self.capture_spots[-perspective].update(enemy_group.liberties)
-                    for liberty in enemy_group.liberties:
-                        if self.is_suicide(liberty, -perspective):
-                            self.suicide_spots[-perspective].add(liberty)
             # if friendly group, merge
             elif self.board[adjacent_spot] == perspective:
                 adjacent_group = self.group_lookup[adjacent_spot]
@@ -154,42 +161,24 @@ class State:
         # if only one liberty left add to enemy's capture spots
         if len(group.liberties) == 1:
             self.capture_spots[perspective].update(group.liberties)
-            liberty = next(iter(group.libterties))
-            if self.is_suicide(liberty, perspective):
-                self.suicide_spots[perspective].add(liberty)
-        # check for enemys suicide spots
-        for adjacent_spot in get_adjacent(stone):
-            if self.board[adjacent_spot] == 0 and self.is_suicide(adjacent_spot, -perspective):
-                    self.suicide_spots[-perspective].add(adjacent_spot)
-
         return
 
     def print(self):
-        for index, group in np.ndenumerate(state.group_lookup):
-            if group:
-                print(index, group)
-                print("stones", group.stones)
-                print("liberties", group.liberties)
+        for group in {group for group in state.group_lookup.flat if group}:
+             print(self.board[next(iter(group.stones))], "group")
+             print("stones", group.stones)
+             print("liberties", group.liberties)
         print(self.board)
         print("capture", self.capture_spots)
-        print("suicide", self.suicide_spots)
         ascii_board = np.chararray(self.board.shape)
         ascii_board[self.board == 0] = ' '
         for capture_spot in self.capture_spots[1]:
             ascii_board[capture_spot] = 'C'
         for capture_spot in self.capture_spots[-1]:
             ascii_board[capture_spot] = 'c'
-        for suicide_spot in self.suicide_spots[1]:
-            ascii_board[suicide_spot] = 'S'
-        for suicide_spot in self.suicide_spots[-1]:
-            ascii_board[suicide_spot] = 's'
         ascii_board[self.board == -1] = 'O'
         ascii_board[self.board == 1] = 'X'
         print(ascii_board.decode('utf-8'))
-
-
-
-
 
 
 class Session:
@@ -228,6 +217,10 @@ state.place_stone((4,0), 1)
 state.place_stone((5,3), -1)
 state.place_stone((6,2), 1)
 state.place_stone((6,3), -1)
+state.place_stone((6,1), 1)
+state.place_stone((6,0), 1)
+state.place_stone((5,0), 1)
+state.place_stone((3,1), 1)
 state.print()
 #state.place_stone((3,4))
 
