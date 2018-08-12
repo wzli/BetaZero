@@ -3,11 +3,11 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
 
+# keras model
 input_dimensions = (2, 3, 3)
 output_dimension = 3
 max_value = 1
 min_max = True
-
 
 def ValueModel():
     model = Sequential()
@@ -23,7 +23,7 @@ def ValueModel():
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
-
+# game rules
 win_masks = np.array(
     [[
         [1, 1, 1],
@@ -97,9 +97,10 @@ def critical_action_filter(state):
             critical += win_masks[i]
     return critical.reshape((3, 3))
 
+#------------ The below is required game interface for betazero
 
 def reduce_symetry(state):
-    """Map symetrically equivalent states to a unique state."""
+    """Map symetrically equivalent states to (unique_state, state_bytes)"""
     symetric_states = [state, np.rot90(state)]
     symetric_states.extend(
         [np.flip(symetric_state, 0) for symetric_state in symetric_states])
@@ -118,8 +119,8 @@ def input_transform(state, reduce_symetry_enable=True):
                      critical_action_filter(reduced_state)))[np.newaxis]
 
 
-def generate_action_choices(state):
-    """Generate an iterator of tuples consisting of (action, state_transition, state_bytes, reward, reset_count)
+def generate_action_space(state):
+    """Generate dict of consisting of state_bytes : (action, state_transition, reward, reset_count)
     for every valid (symetry reduced) action from a given state
     """
     actions = {}
@@ -128,8 +129,7 @@ def generate_action_choices(state):
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
             actions[reduced_bytes] = [
-                action, reduced_state, reward, reset_count
-            ]
+                action, reduced_state, reward, reset_count]
     return actions
 
 
