@@ -29,24 +29,22 @@ def get_actions(state, session=None):
     return actions
 
 
-def get_empty(state):
-    return {index for index, spot in np.ndenumerate(self.state) if spot == 0}
-
-
-class StoneGroup:
-    def __init__(self, stone):
-        self.stones = {stone}
-        self.liberties = set()
-
 def score_board(board):
     return 0
 
-class State:
+STONES = 0
+LIBERTIES = 1
+
+class Session:
     def __init__(self):
         self.perspective = 1
+        self.reset()
+
+    def reset(self):
         self.board = np.zeros(board_size, dtype=np.int8)
         self.group_lookup = np.empty(board_size, dtype=object)
         self.capture_spots = (None, set(), set())
+        self.empty_spots = {index for index, _ in np.ndenumerate(self.board)}
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
@@ -74,18 +72,18 @@ class State:
     def is_suicide(self, stone, perspective = None):
         if not perspective:
             perspective = self.perspective
-        # iterate adjacent stones
+        # iterate adjacent[STONES]
         for adjacent_spot in get_adjacent(stone):
             # creates liberty, not suicide
             if self.board[adjacent_spot] == 0:
                 return False
             # if any adjacent friendly group has more than one liberty, not suicide
             if (self.board[adjacent_spot] == perspective
-                    and len(self.group_lookup[adjacent_spot].liberties) > 1):
+                    and len(self.group_lookup[adjacent_spot][LIBERTIES]) > 1):
                 return False
             # if any adjacent enemy group can be captured, not suicide
             if (self.board[adjacent_spot] == -perspective
-                    and len(self.group_lookup[adjacent_spot].liberties) == 1):
+                    and len(self.group_lookup[adjacent_spot][LIBERTIES]) == 1):
                 return False
         # fails checks, is suicide
         print("no suicide")
@@ -110,9 +108,10 @@ class State:
         if self.is_invalid(stone, perspective):
             return
         # create stone group with a single stone
-        group = StoneGroup(stone)
+        group = ({stone}, set())
         self.group_lookup[stone] = group
         self.board[stone] = perspective
+        self.empty_spots.remove(stone)
         # only the adjacent spots of affected
         for adjacent_spot in get_adjacent(stone):
             # if there is an adjacent enemy
@@ -120,54 +119,55 @@ class State:
                 # look up enemy group
                 enemy_group = self.group_lookup[adjacent_spot]
                 # remove a liberty from their stone group
-                enemy_group.liberties.remove(stone)
+                enemy_group[LIBERTIES].remove(stone)
                 # if no more liberties left capture enemy
-                if not enemy_group.liberties:
+                if not enemy_group[LIBERTIES]:
                     # remove the capture spot from list
                     self.capture_spots[-perspective].discard(stone)
                     # recode ko if only one piece was taken
-                    if len(enemy_group.stones) == 1:
-                        self.ko = next(iter(enemy_group.stones))
+                    if len(enemy_group[STONES]) == 1:
+                        self.ko = next(iter(enemy_group[STONES]))
                     else:
                         self.ko = None
                     # remove peices
-                    for captured in enemy_group.stones:
+                    self.empty_spots.update(enemy_group[STONES])
+                    for captured in enemy_group[STONES]:
                         self.board[captured] = 0
                         self.group_lookup[captured] = None
                         # add liberties back to surrounding friendly groups
                         for released in get_adjacent(captured):
                             if self.board[released] == perspective:
                                 released_group = self.group_lookup[released]
-                                if len(released_group.liberties) == 1:
-                                   self.capture_spots[perspective].discard(next(iter(released_group.liberties)))
-                                released_group.liberties.add(captured)
+                                if len(released_group[LIBERTIES]) == 1:
+                                   self.capture_spots[perspective].discard(next(iter(released_group[LIBERTIES])))
+                                released_group[LIBERTIES].add(captured)
                 # if one liberty left, add to capture spots
-                elif len(enemy_group.liberties) == 1:
-                    self.capture_spots[-perspective].update(enemy_group.liberties)
+                elif len(enemy_group[LIBERTIES]) == 1:
+                    self.capture_spots[-perspective].update(enemy_group[LIBERTIES])
             # if friendly group, merge
             elif self.board[adjacent_spot] == perspective:
                 adjacent_group = self.group_lookup[adjacent_spot]
-                if len(adjacent_group.liberties) == 1:
+                if len(adjacent_group[LIBERTIES]) == 1:
                      self.capture_spots[perspective].discard(stone)
-                adjacent_group.liberties.remove(stone)
-                group.stones.update(adjacent_group.stones)
-                group.liberties.update(adjacent_group.liberties)
+                adjacent_group[LIBERTIES].remove(stone)
+                group[STONES].update(adjacent_group[STONES])
+                group[LIBERTIES].update(adjacent_group[LIBERTIES])
                 # update old group to point to new group
-                for adjacent_group_stone in adjacent_group.stones:
+                for adjacent_group_stone in adjacent_group[STONES]:
                     self.group_lookup[adjacent_group_stone] = group
             # add liberties if there are free space
             elif self.board[adjacent_spot] == 0:
-                group.liberties.add(adjacent_spot)
+                group[LIBERTIES].add(adjacent_spot)
         # if only one liberty left add to enemy's capture spots
-        if len(group.liberties) == 1:
-            self.capture_spots[perspective].update(group.liberties)
+        if len(group[LIBERTIES]) == 1:
+            self.capture_spots[perspective].update(group[LIBERTIES])
         return
 
     def print(self):
-        for group in {group for group in state.group_lookup.flat if group}:
-             print(self.board[next(iter(group.stones))], "group")
-             print("stones", group.stones)
-             print("liberties", group.liberties)
+        #for group in {group for group in state.group_lookup.flat if group}:
+        #     print(self.board[next(iter(group[STONES]))], "group")
+        #     print("stones", group[STONES])
+        #     print("liberties", group[LIBERTIES])
         print(self.board)
         print("capture", self.capture_spots)
         ascii_board = np.chararray(self.board.shape)
@@ -179,14 +179,6 @@ class State:
         ascii_board[self.board == -1] = 'O'
         ascii_board[self.board == 1] = 'X'
         print(ascii_board.decode('utf-8'))
-
-
-class Session:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        return self.state, 0, 0
 
     def do_action(self, action):
         state, reward, reset_count = predict_action(self.state, action, self)
@@ -200,28 +192,92 @@ class Session:
         return state, reward, reset_count
 
 
+#------------ The below is required game interface for betazero
+
+class State:
+    def __init__(self, session, perspective):
+        self.session = session
+        self.perspective = perspective
+        self.board = session.board * perspective
+        self.capture_spots = (None, tuple(session.capture_spots[1]), tuple(session.capture_spots[-1]))
+
+    def __neg__(self):
+        return State(self.session, -self.perspective)
 
 
-state = State()
-state.place_stone((3,3), 1)
-state.place_stone((3,4), -1)
-state.place_stone((2,3), 1)
-state.place_stone((4,2), -1)
-state.place_stone((4,3), 1)
-state.place_stone((1,4), -1)
-state.place_stone((5,2), 1)
-state.place_stone((4,1), -1)
-state.place_stone((3,2), 1)
-state.place_stone((5,1), -1)
-state.place_stone((4,0), 1)
-state.place_stone((5,3), -1)
-state.place_stone((6,2), 1)
-state.place_stone((6,3), -1)
-state.place_stone((6,1), 1)
-state.place_stone((6,0), 1)
-state.place_stone((5,0), 1)
-state.place_stone((3,1), 1)
-state.print()
-#state.place_stone((3,4))
+coordinate_swap = (
+    (lambda row, col: (row, col)),
+    (lambda row, col: (-col, row)),
+    (lambda row, col: (row, -col)),
+    (lambda row, col: (-col, -row)),
+    (lambda row, col: (-row, col)),
+    (lambda row, col: (-col, -row)),
+    (lambda row, col: (-row, -col)),
+    (lambda row, col: (col, -row)),
+)
 
-#state.change_perspective()
+
+def reduce_symetry(state):
+    """Map symetrically equivalent states to (unique_state, state_bytes)"""
+    # unique state
+    symetric_states = [state.board, np.rot90(state.board)]
+    symetric_states.extend(
+        [np.flip(symetric_state, 0) for symetric_state in symetric_states])
+    symetric_states.extend(
+        [np.flip(symetric_state, 1) for symetric_state in symetric_states])
+    byte_representations = (symetric_state.tobytes()
+                            for symetric_state in symetric_states)
+    unique_state, byte_representation, symetry_index = max(zip(
+            symetric_states, byte_representations, range(len(symetric_states))), key=lambda x: x[1])
+    #store reduced symetry back to state
+    state.board = unique_state
+    for perspective in (1, -1):
+        state.capture_spots[perspective] = (coordinate_swap[symetry_index](spot)
+                for spot in state.capture_spots[perspective])
+    return (state, byte_representation)
+
+
+def input_transform(state, reduce_symetry_enable=True):
+    """Transform an input state to an input format the model requires"""
+    # reduce symetry if requested
+    if reduce_symetry_enable:
+        reduce_symetry(state)
+    # create capture spots 2d array
+    capture_spots = nd.zeros(state.board.shape, dtype=np.int8)
+    for perspective in (1, -1):
+        for index in state.capture_spots[perspective]:
+            capture_spots[index] = perspective * state.perspective
+    return np.array((state.board, capture_spots))[np.newaxis]
+
+
+def generate_action_space(state):
+    """Generate dict of consisting of state_bytes : (action, state_transition, reward, reset_count)
+    for every valid (symetry reduced) action from a given state
+    """
+    return
+
+
+
+session = Session()
+session.place_stone((3,3), 1)
+session.place_stone((3,4), -1)
+session.place_stone((2,3), 1)
+session.place_stone((4,2), -1)
+session.place_stone((4,3), 1)
+session.place_stone((1,4), -1)
+session.place_stone((5,2), 1)
+session.place_stone((4,1), -1)
+session.place_stone((3,2), 1)
+session.place_stone((5,1), -1)
+session.place_stone((4,0), 1)
+session.place_stone((5,3), -1)
+session.place_stone((6,2), 1)
+session.place_stone((6,3), -1)
+session.place_stone((6,1), 1)
+session.place_stone((6,0), 1)
+session.place_stone((5,0), 1)
+session.place_stone((3,1), 1)
+session.print()
+#session.place_stone((3,4))
+
+#session.change_perspective()
