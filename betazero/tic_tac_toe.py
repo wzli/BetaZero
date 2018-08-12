@@ -9,6 +9,7 @@ output_dimension = 3
 max_value = 1
 min_max = True
 
+
 def ValueModel():
     model = Sequential()
     model.add(
@@ -22,6 +23,7 @@ def ValueModel():
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
+
 
 # game rules
 win_masks = np.array(
@@ -97,7 +99,9 @@ def critical_action_filter(state):
             critical += win_masks[i]
     return critical.reshape((3, 3))
 
+
 #------------ The below is required game interface for betazero
+
 
 def reduce_symetry(state):
     """Map symetrically equivalent states to (unique_state, state_bytes)"""
@@ -129,7 +133,8 @@ def generate_action_space(state):
         reduced_state, reduced_bytes = reduce_symetry(state_transition)
         if reduced_bytes not in actions:
             actions[reduced_bytes] = [
-                action, reduced_state, reward, reset_count]
+                action, reduced_state, reward, reset_count
+            ]
     return actions
 
 
