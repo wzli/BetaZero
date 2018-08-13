@@ -55,7 +55,10 @@ class Agent:
         # if explore, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
         # othersize, don't sample, just take the expected value
-        value_sample = lambda value_pdf: np.random.choice(value_pdf.shape[0], p=value_pdf) if explore else lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), value_pdf)
+        if explore:
+            value_sample = lambda value_pdf: np.random.choice(value_pdf.shape[0], p=value_pdf)
+        else:
+            value_sample = lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), weights=value_pdf)
         value_samples = np.array([
             value_sample(value_pdf) if reset_count == 0 else value_to_index(
                 reward / self.game.max_value, self.game.output_dimension)
@@ -73,8 +76,10 @@ class Agent:
         if steps < 1:
             raise ValueError("step number < 1")
         # generate input set based on recent history
-        training_input_set = (self.game.input_transform(input_state)
-                              for input_state in self.state_history[-steps:])
+        training_input_set = [
+            self.game.input_transform(input_state)
+            for input_state in self.state_history[-steps:]
+        ]
         symetric_training_input_set = sum([
             list(x) for x in zip(*(self.game.symetry_set(input_tensor)
                                    for input_tensor in training_input_set))
@@ -115,6 +120,8 @@ class Agent:
         training_target_set = list(reversed(training_target_set))
         symetry_set_size = len(symetric_training_input_set) // len(
             training_target_set)
+        self.x_train = training_input_set
+        self.y_train = training_target_set
         return np.vstack(symetric_training_input_set), np.vstack(
             training_target_set * symetry_set_size)
 
@@ -132,9 +139,8 @@ class Agent:
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
             # if the game resets, train the network
-            self.x_train, self.y_train = self.generate_training_set(
-                reset_count)
-            self.value_model.fit(self.x_train, self.y_train, verbose=0)
+            x_train, y_train = self.generate_training_set(reset_count)
+            self.value_model.fit(x_train, y_train, verbose=0)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.reward_history = self.reward_history[:-reset_count]
