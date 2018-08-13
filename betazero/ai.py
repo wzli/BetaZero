@@ -75,6 +75,10 @@ class Agent:
         # generate input set based on recent history
         training_input_set = (self.game.input_transform(input_state)
                               for input_state in self.state_history[-steps:])
+        symetric_training_input_set = sum([
+            list(x) for x in zip(*(self.game.symetry_set(input_tensor)
+                                   for input_tensor in training_input_set))
+        ], [])
         # if already at terminal state, there is no future value only rewrad
         if terminal_state or not self.action_prediction_history[-1]:
             training_target_set = [
@@ -108,8 +112,11 @@ class Agent:
             if self.game.min_max:
                 value_update = np.flip(value_update, 0)
             training_target_set.append(value_update)
-        training_target_set = reversed(training_target_set)
-        return np.vstack(training_input_set), np.vstack(training_target_set)
+        training_target_set = list(reversed(training_target_set))
+        symetry_set_size = len(symetric_training_input_set) // len(
+            training_target_set)
+        return np.vstack(symetric_training_input_set), np.vstack(
+            training_target_set * symetry_set_size)
 
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:

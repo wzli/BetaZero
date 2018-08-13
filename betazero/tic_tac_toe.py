@@ -14,12 +14,12 @@ def ValueModel():
     model = Sequential()
     model.add(
         Conv2D(
-            16, (3, 3),
+            32, (3, 3),
             activation='selu',
             input_shape=input_dimensions,
             data_format="channels_first"))
     model.add(Flatten())
-    model.add(Dense(8, activation='selu'))
+    model.add(Dense(16, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
@@ -103,16 +103,20 @@ def critical_action_filter(state):
 #------------ The below is required game interface for betazero
 
 
-def reduce_symetry(state):
-    """Map symetrically equivalent states to (unique_state, state_bytes)"""
-    symetric_states = [state, np.rot90(state)]
-    symetric_states.extend(
-        [np.flip(symetric_state, 0) for symetric_state in symetric_states])
-    symetric_states.extend(
-        [np.flip(symetric_state, 1) for symetric_state in symetric_states])
-    byte_representations = (symetric_state.tobytes()
-                            for symetric_state in symetric_states)
-    return max(zip(symetric_states, byte_representations), key=lambda x: x[1])
+def symetry_set(state):
+    """generate list of symetrically equivalent states"""
+    symetric_states = [
+        state, np.swapaxes(state, state.ndim - 1, state.ndim - 2)
+    ]
+    symetric_states.extend([
+        np.flip(symetric_state, state.ndim - 1)
+        for symetric_state in symetric_states
+    ])
+    symetric_states.extend([
+        np.flip(symetric_state, state.ndim - 2)
+        for symetric_state in symetric_states
+    ])
+    return symetric_states
 
 
 def input_transform(state):
