@@ -63,6 +63,20 @@ win_masks = np.array(
     dtype=np.int8).reshape(8, 3 * 3)
 
 
+def critical_action_filter(state):
+    """Generate a map of critical spots same dimension as input state"""
+    critical = np.zeros(9, dtype=np.int8)
+    for i, n_inline in np.ndenumerate(win_masks.dot(state.flat)):
+        if abs(n_inline) == 2:
+            critical += win_masks[i] - np.abs(state.flat * win_masks[i])
+        elif abs(n_inline) == 3:
+            critical += win_masks[i]
+    return critical.reshape((3, 3))
+
+
+#------------ The below is required game interface for betazero
+
+
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     return [action for action, spot in np.ndenumerate(state) if spot == 0]
@@ -87,20 +101,6 @@ def predict_action(state, action):
         return state_transition, 0, 9
     # not an end condition
     return state_transition, 0, 0
-
-
-def critical_action_filter(state):
-    """Generate a map of critical spots same dimension as input state"""
-    critical = np.zeros(9, dtype=np.int8)
-    for i, n_inline in np.ndenumerate(win_masks.dot(state.flat)):
-        if abs(n_inline) == 2:
-            critical += win_masks[i] - np.abs(state.flat * win_masks[i])
-        elif abs(n_inline) == 3:
-            critical += win_masks[i]
-    return critical.reshape((3, 3))
-
-
-#------------ The below is required game interface for betazero
 
 
 def symetry_set(state):

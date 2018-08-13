@@ -30,6 +30,22 @@ def within_bounds(index):
     return row < 0 or row >= board_size[0] or col < 0 or col <= board_size[1]
 
 
+def find_group(board, spot):
+    color = board[spot]
+    group = {spot}
+    border = set()
+    frontier = [spot]
+    while frontier:
+        current_spot = frontier.pop()
+        group.add(current_spot)
+        for adjacent_spot in get_adjacent(current_spot):
+            if board[adjacent_spot] == color and adjacent_spot not in group:
+                frontier.append(adjacent_spot)
+            elif board[adjacent_spot] != color:
+                border.add(adjacent_spot)
+    return group, border
+
+
 # core go engine
 class Session:
     def __init__(self):
@@ -45,37 +61,31 @@ class Session:
         self.ko = None
         self.n_turns = 0
 
-    def get_action_set(self, perspective=None):
-        if not perspective:
-            perspective = self.perspective
-        # take all empty spots minus the suicidal ones
-        action_set = self.empty_spots.difference({
-            spot
-            for spot in self.capture_spots[perspective] if is_suicide(spot)
-        })
-        # action None is to pass
-        action_set.add(None)
-        # can't take back a ko
-        if self.ko:
-            action_set.remove(self.ko)
-        return action_set
-
-    def predict_action(self, action):
-        # if turn pass
-        if not action:
-            # score and end the game when both players pass
-            if self.turn_pass:
-                return self.board, score_board(board), self.n_turns + 1
-            # continue game otherwise
-            return board, 0, 0
-        # evaluation
-        board = self.evaluate_stone(action)
-        return board
-
     def get_score(self, perspective=None):
         if not perspective:
             perspective = self.perspective
-        return 0
+        # assume all dead stones are already captured, otherwise
+        # there's no easy way to tell life or death
+        # every peice counts as a point
+        unique, counts = np.unique(self.board, return_counts=True)
+        score = np.sum(unique * counts)
+        # settle the territory
+        unclaimed_spots = set(self.empty_spots)
+        while unclaimed_spots:
+            territory, border = find_group(self.board, unclaimed_spots.pop())
+            unclaimed_spots.difference_update(territory)
+            # decide owner of territory based on border
+            owner = 0
+            for stone in border:
+                if owner == 0 and self.board[stone] == 1:
+                    owner = 1
+                elif owner == 0 and self.board[stone] == -1:
+                    owner = -1
+                elif owner != self.board[stone]:
+                    owner = 0
+                    break
+            score += owner * len(territory)
+        return score * perspective
 
     # this function enforces swaping perspectives, otherwise min max tree won't work
     def do_action(self, action):
@@ -226,16 +236,54 @@ class Session:
 #------------ The below is required game interface for betazero
 
 
+def get_actions(state):
+    # take all empty spots minus the suicidal ones
+    action_set = state.session.empty_spots.difference({
+        spot
+        for spot in state.session.capture_spots[state.perspective]
+        if (state.session.is_suicide(spot, state.perspective))
+    })
+    # action None is to pass
+    action_set.add(None)
+    # can't take back a ko
+    if state.session.ko:
+        action_set.remove(state.session.ko)
+    return action_set
+
+
+def predict_action(self, action):
+    # if turn pass
+    if not action:
+        # score and end the game when both players pass
+        if self.turn_pass:
+            return self.board, score_board(board), self.n_turns + 1
+        # continue game otherwise
+        return board, 0, 0
+    # evaluation
+    board = self.evaluate_stone(action)
+    return board
+
+
 class State:
-    def __init__(self, session, perspective):
-        self.session = session
+    def __init__(self, parent, perspective):
         self.perspective = perspective
-        self.board = session.board * perspective
-        self.capture_spots = (None, tuple(session.capture_spots[1]),
-                              tuple(session.capture_spots[-1]))
+        if parent is Session:
+            self.session = parent
+            #make frozen copy from session
+            self.board = np.copy(parent.board)
+            self.capture_spots = (None, tuple(session.capture_spots[1]),
+                                  tuple(session.capture_spots[-1]))
+        elif parent is State:
+            #make frozen copy from state
+            self.session = parent.session
+            self.board = np.copy(parent.board)
+            self.capture_spots = parent.capture_spots
 
     def __neg__(self):
         return State(self.session, -self.perspective)
+
+    def tobytes():
+        return self.board.tobytes()
 
 
 coordinate_swap = (
@@ -250,47 +298,14 @@ coordinate_swap = (
 )
 
 
-def reduce_symetry(state):
-    """Map symetrically equivalent states to (unique_state, state_bytes)"""
-    # unique state
-    symetric_states = [state.board, np.rot90(state.board)]
-    symetric_states.extend(
-        [np.flip(symetric_state, 0) for symetric_state in symetric_states])
-    symetric_states.extend(
-        [np.flip(symetric_state, 1) for symetric_state in symetric_states])
-    byte_representations = (symetric_state.tobytes()
-                            for symetric_state in symetric_states)
-    unique_state, byte_representation, symetry_index = max(
-        zip(symetric_states, byte_representations,
-            range(len(symetric_states))),
-        key=lambda x: x[1])
-    #store reduced symetry back to state
-    state.board = unique_state
-    for perspective in (1, -1):
-        state.capture_spots[perspective] = (
-            coordinate_swap[symetry_index](spot)
-            for spot in state.capture_spots[perspective])
-    return (state, byte_representation)
-
-
-def input_transform(state, reduce_symetry_enable=True):
+def input_transform(state):
     """Transform an input state to an input format the model requires"""
-    # reduce symetry if requested
-    if reduce_symetry_enable:
-        reduce_symetry(state)
     # create capture spots 2d array
     capture_spots = nd.zeros(state.board.shape, dtype=np.int8)
     for perspective in (1, -1):
         for index in state.capture_spots[perspective]:
             capture_spots[index] = perspective * state.perspective
     return np.array((state.board, capture_spots))[np.newaxis]
-
-
-def generate_action_space(state):
-    """Generate dict of consisting of state_bytes : (action, state_transition, reward, reset_count)
-    for every valid (symetry reduced) action from a given state
-    """
-    return
 
 
 session = Session()
@@ -313,6 +328,6 @@ session.place_stone((6, 0), 1)
 session.place_stone((5, 0), 1)
 session.place_stone((3, 1), 1)
 session.print_status()
-#session.place_stone((3,4))
+print(session.get_score(-1))
 
 #session.change_perspective()
