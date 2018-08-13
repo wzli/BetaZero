@@ -2,6 +2,12 @@ import numpy as np
 from keras.models import load_model
 from .utils import *
 
+ACTIONS = 0
+STATE_TRANSITIONS = 1
+REWARDS = 2
+RESET_COUNTS = 3
+VALUE_PDFS = 4
+
 
 class Agent:
     def __init__(self, game, model):
@@ -14,8 +20,6 @@ class Agent:
         self.state_history = []
         self.reward_history = []
         self.action_prediction_history = []
-        self.action_selection_history = []
-        self.action_index_lookup = None
         # only for debug
         self.value_samples = None
         self.x_train = None
@@ -24,50 +28,45 @@ class Agent:
     def generate_predictions(self, state):
         """from current state generate a tuple of:
         (actions, state_transitions, rewards, reset_counts, value_pdfs)
-        and the action index lookup table keyed by bytes of the state transition
         """
         # expect state in self perspective if min-max
-        action_space = self.game.generate_action_space(state)
-        if not action_space:
-            return None, None
-        # create action index lookup
-        state_byte_keys, action_predictions = zip(*action_space.items())
-        action_index_lookup = {
-            state_byte_key: i
-            for i, state_byte_key in enumerate(state_byte_keys)
-        }
+        actions = self.game.get_actions(state)
+        if not actions:
+            return None
         # create predictions
-        action_predictions = list(zip(*action_predictions))
+        state_transitions, rewards, reset_counts = list(
+            zip(*(self.game.predict_action(state, action)
+                  for action in actions)))
         # use model to predict the value pdf of each action in action space
-        action_predictions.append(
-            self.value_model.predict(
-                np.vstack((self.game.input_transform(state_transition, False)
-                           for state_transition in action_predictions[1]))))
-        return (action_predictions, action_index_lookup)
+        value_pdfs = self.value_model.predict(
+            np.vstack((self.game.input_transform(state_transition)
+                       for state_transition in state_transitions)))
+        return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, state=None):
+    def generate_action(self, explore=True, state=None):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
-        predictions = self.generate_predictions(state)[
-            0] if state else self.action_prediction_history[-1]
+        predictions = self.generate_predictions(
+            state) if state else self.action_prediction_history[-1]
         # action space is empty
         if not predictions:
             return None
         actions, _, rewards, reset_counts, value_pdfs = predictions
-        # Thompson Sampling based action selection:
+        # if explore, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
-        # and take the max, if max has multiple, randomly choose one
+        # othersize, don't sample, just take the expected value
+        value_sample = lambda value_pdf: np.random.choice(value_pdf.shape[0], p=value_pdf) if explore else lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), value_pdf)
         value_samples = np.array([
-            np.random.choice(value_pdf.shape[0], p=value_pdf)
-            if reset_count == 0 else value_to_index(
+            value_sample(value_pdf) if reset_count == 0 else value_to_index(
                 reward / self.game.max_value, self.game.output_dimension)
             for value_pdf, reward, reset_count in zip(value_pdfs, rewards,
                                                       reset_counts)
         ])
-        max_value_sample_index = np.random.choice(
+        # take the max, if max has multiple, randomly choose one
+        max_value_index = np.random.choice(
             np.argwhere(value_samples == np.amax(value_samples)).flat)
         self.value_samples = value_samples
-        return actions[max_value_sample_index]
+        return actions[max_value_index]
 
     def generate_training_set(self, steps, terminal_state=True):
         """generate a training set by propagative rewards back in state history"""
@@ -85,20 +84,26 @@ class Agent:
         else:
             training_target_set = [
                 shift_pdf(
-                    max_pdf(self.action_prediction_history[-1][-1]),
+                    max_pdf(self.action_prediction_history[-1][VALUE_PDFS]),
                     self.reward_history[-1] / self.game.max_value)
             ]
         # if min_max, flip value_pdfs to other player's perspective
         if self.game.min_max:
             training_target_set[0] = np.flip(training_target_set[0], 0)
-        for reward, action_index, action_predictions in zip(
+        for chosen_state, reward, action_predictions in zip(
+                reversed(self.state_history[-steps + 1:]),
                 reversed(self.reward_history[-steps:-1]),
-                reversed(self.action_selection_history[-steps + 1:]),
                 reversed(self.action_prediction_history[-steps:-1])):
-            action_predictions[-1][action_index] = training_target_set[-1]
+            action_index = [
+                state_transition.tobytes()
+                for state_transition in action_predictions[STATE_TRANSITIONS]
+            ].index(chosen_state.tobytes())
+            action_predictions[VALUE_PDFS][action_index] = training_target_set[
+                -1]
             # shift pdf to add reward, max_pdf is the pdf equivalent of max()
             value_update = shift_pdf(
-                max_pdf(action_predictions[-1]), reward / self.game.max_value)
+                max_pdf(action_predictions[VALUE_PDFS]),
+                reward / self.game.max_value)
             # if min_max, flip value_pdfs to other player's perspective
             if self.game.min_max:
                 value_update = np.flip(value_update, 0)
@@ -109,18 +114,13 @@ class Agent:
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:
             raise ValueError("reset_count < 0")
-        # associate new state with previously predictied action that caused the transition
-        if self.action_index_lookup:
-            _, state_bytes = self.game.reduce_symetry(state)
-            self.action_selection_history.append(
-                self.action_index_lookup[state_bytes])
         # save in history
         self.state_history.append(state)
         self.reward_history.append(-reward if self.game.min_max else reward)
         # generate predictions for possible actions in the new state
         # if min max, assumes input state is in opponent's perspective
         # need to change to current player's perspective as input to generate perdictions
-        action_predictions, self.action_index_lookup = self.generate_predictions(
+        action_predictions = self.generate_predictions(
             -state if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
@@ -131,15 +131,14 @@ class Agent:
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.reward_history = self.reward_history[:-reset_count]
-            self.action_selection_history = self.action_selection_history[:
-                                                                          -reset_count]
-            # re-predict actions for initial state after training
             self.action_prediction_history = self.action_prediction_history[:
                                                                             -reset_count
                                                                             -
                                                                             1]
-            action_predictions, self.action_index_lookup = self.generate_predictions(
-                self.state_history[-1])
+            # re-predict actions for initial state after training
+            action_predictions = self.generate_predictions(
+                -self.state_history[-1]
+                if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
         elif not self.action_prediction_history[-1]:
             raise ValueError("no more actions but game doesn't reset")

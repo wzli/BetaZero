@@ -65,7 +65,7 @@ win_masks = np.array(
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    return (action for action, spot in np.ndenumerate(state) if spot == 0)
+    return [action for action, spot in np.ndenumerate(state) if spot == 0]
 
 
 def predict_action(state, action):
@@ -115,27 +115,9 @@ def reduce_symetry(state):
     return max(zip(symetric_states, byte_representations), key=lambda x: x[1])
 
 
-def input_transform(state, reduce_symetry_enable=True):
+def input_transform(state):
     """Transform an input state to an input format the model requires"""
-    reduced_state = reduce_symetry(state)[
-        0] if reduce_symetry_enable else state
-    return np.array((reduced_state,
-                     critical_action_filter(reduced_state)))[np.newaxis]
-
-
-def generate_action_space(state):
-    """Generate dict of consisting of state_bytes : (action, state_transition, reward, reset_count)
-    for every valid (symetry reduced) action from a given state
-    """
-    actions = {}
-    for action in get_actions(state):
-        state_transition, reward, reset_count = predict_action(state, action)
-        reduced_state, reduced_bytes = reduce_symetry(state_transition)
-        if reduced_bytes not in actions:
-            actions[reduced_bytes] = [
-                action, reduced_state, reward, reset_count
-            ]
-    return actions
+    return np.array((state, critical_action_filter(state)))[np.newaxis]
 
 
 class Session:
