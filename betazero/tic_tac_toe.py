@@ -4,10 +4,13 @@ from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
 
 # keras model
-input_dimensions = (2, 3, 3)
+input_dimensions = (1, 3, 3)
 output_dimension = 3
 max_value = 1
 min_max = True
+rotational_symetry = True
+vertical_symetry = True
+horizontal_symetry = True
 
 
 def ValueModel():
@@ -63,17 +66,6 @@ win_masks = np.array(
     dtype=np.int8).reshape(8, 3 * 3)
 
 
-def critical_action_filter(state):
-    """Generate a map of critical spots same dimension as input state"""
-    critical = np.zeros(9, dtype=np.int8)
-    for i, n_inline in np.ndenumerate(win_masks.dot(state.flat)):
-        if abs(n_inline) == 2:
-            critical += win_masks[i] - np.abs(state.flat * win_masks[i])
-        elif abs(n_inline) == 3:
-            critical += win_masks[i]
-    return critical.reshape((3, 3))
-
-
 #------------ The below is required game interface for betazero
 
 
@@ -103,25 +95,9 @@ def predict_action(state, action):
     return state_transition, 0, 0
 
 
-def symetry_set(state):
-    """generate list of symetrically equivalent states"""
-    symetric_states = [
-        state, np.swapaxes(state, state.ndim - 1, state.ndim - 2)
-    ]
-    symetric_states.extend([
-        np.flip(symetric_state, state.ndim - 1)
-        for symetric_state in symetric_states
-    ])
-    symetric_states.extend([
-        np.flip(symetric_state, state.ndim - 2)
-        for symetric_state in symetric_states
-    ])
-    return symetric_states
-
-
 def input_transform(state):
     """Transform an input state to an input format the model requires"""
-    return np.array((state, critical_action_filter(state)))[np.newaxis]
+    return np.array([state])[np.newaxis]
 
 
 class Session:

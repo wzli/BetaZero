@@ -50,3 +50,23 @@ def max_pdf(pdfs):
     max_pdf = np.diff(max_cdf)
     max_pdf = max_pdf / np.sum(max_pdf)
     return max_pdf
+
+
+def symetric_arrays(array, rotational_symetry, vertical_symetry, horizontal_symetry):
+    """generate list of symetrically equivalent arrays"""
+    symetric_arrays = [array]
+    if rotational_symetry:
+        symetric_arrays.append(
+        np.rot90(array, axes=(array.ndim - 2, array.ndim - 1))
+        )
+    if vertical_symetry:
+        symetric_arrays.extend([
+            np.flip(symetric_array, array.ndim - 1)
+            for symetric_array in symetric_arrays
+        ])
+    if horizontal_symetry:
+        symetric_arrays.extend([
+            np.flip(symetric_array, array.ndim - 2)
+            for symetric_array in symetric_arrays
+        ])
+    return symetric_arrays

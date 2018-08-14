@@ -42,7 +42,7 @@ if args.self_train:
                 save_time = timeit.default_timer()
                 save_count_down = args.save_interval
                 for x, y in zip(agent.x_train, agent.y_train):
-                    print(x[0, 0], y)
+                    print(x[0], y)
                 continue
 
                 for i, pdf in enumerate(agent.y_train):
