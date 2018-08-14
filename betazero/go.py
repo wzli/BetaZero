@@ -46,7 +46,98 @@ def find_group(board, spot):
     return group, border
 
 
+def liberty_map(board, group_lookup):
+    return board * np.vectorize(lambda x: len(x[LIBERTIES]) if x else 0)(
+        group_lookup)
+
+
+def territory_map(board, group_lookup):
+    territory_map = np.copy(board)
+    frontier = set()
+    # start from the borders of each stone group
+    for group in group_lookup.flat:
+        if group:
+            frontier.update(group[LIBERTIES])
+    # itteratively convert empty spots to their adjacent majority
+    while frontier:
+        next_frontier = []
+        for spot in frontier:
+            adjacent_spots = get_adjacent(spot)
+            territory_map[spot] = np.sign(
+                sum((territory_map[adjacent_spot]
+                     for adjacent_spot in adjacent_spots)))
+            if territory_map[spot] != 0:
+                next_frontier.extend([
+                    adjacent_spot for adjacent_spot in adjacent_spots
+                    if territory_map[adjacent_spot] == 0
+                ])
+        frontier = next_frontier
+    return territory_map
+
+
 # core go engine
+def place_stone(stone, perspective, board, group_lookup, session=None):
+    # create stone group with a single stone
+    group = ({stone}, set())
+    group_lookup[stone] = group
+    board[stone] = perspective
+    if session:
+        session.empty_spots.remove(stone)
+    # only the adjacent spots of affected
+    for adjacent_spot in get_adjacent(stone):
+        # if there is an adjacent enemy
+        if board[adjacent_spot] == -perspective:
+            # look up enemy group
+            enemy_group = group_lookup[adjacent_spot]
+            # remove a liberty from their stone group
+            enemy_group[LIBERTIES].remove(stone)
+            # if no more liberties left capture enemy
+            if not enemy_group[LIBERTIES]:
+                # remove the capture spot from list
+                if session:
+                    session.capture_spots[-perspective].discard(stone)
+                    # recode ko if only one piece was taken
+                    if len(enemy_group[STONES]) == 1:
+                        session.ko = next(iter(enemy_group[STONES]))
+                    else:
+                        session.ko = None
+                    # remove peices
+                    session.empty_spots.update(enemy_group[STONES])
+                for captured in enemy_group[STONES]:
+                    board[captured] = 0
+                    group_lookup[captured] = None
+                    # add liberties back to surrounding friendly groups
+                    for released in get_adjacent(captured):
+                        if board[released] == perspective:
+                            released_group = group_lookup[released]
+                            if session and len(released_group[LIBERTIES]) == 1:
+                                session.capture_spots[perspective].discard(
+                                    next(iter(released_group[LIBERTIES])))
+                            released_group[LIBERTIES].add(captured)
+            # if one liberty left, add to capture spots
+            elif session and len(enemy_group[LIBERTIES]) == 1:
+                session.capture_spots[-perspective].update(
+                    enemy_group[LIBERTIES])
+        # if friendly group, merge
+        elif board[adjacent_spot] == perspective:
+            adjacent_group = group_lookup[adjacent_spot]
+            if session and len(adjacent_group[LIBERTIES]) == 1:
+                session.capture_spots[perspective].discard(stone)
+            adjacent_group[LIBERTIES].remove(stone)
+            group[STONES].update(adjacent_group[STONES])
+            group[LIBERTIES].update(adjacent_group[LIBERTIES])
+            # update old group to point to new group
+            for adjacent_group_stone in adjacent_group[STONES]:
+                group_lookup[adjacent_group_stone] = group
+        # add liberties if there are free space
+        elif board[adjacent_spot] == 0:
+            group[LIBERTIES].add(adjacent_spot)
+    # if only one liberty left add to enemy's capture spots
+    if session and len(group[LIBERTIES]) == 1:
+        session.capture_spots[perspective].update(group[LIBERTIES])
+    return board, group_lookup
+
+
 class Session:
     def __init__(self):
         self.perspective = 1
@@ -92,7 +183,8 @@ class Session:
         # end of game when both players pass
         if not action:
             #state doesn't change
-            state = State(self, self.perspective)
+            state = State(self, self.board, self.group_lookup,
+                          self.perspective)
             self.n_turns += 1
             if self.turn_pass:
                 reward = self.get_score(self.perspective)
@@ -105,15 +197,20 @@ class Session:
                 self.perspective *= -1
         else:
             # place stone
-            if self.place_stone(action, self.perspective):
-                state = State(self, self.perspective)
+            if self.is_invalid(action, self.perspective):
+                place_stone(action, self.perspective, self.board,
+                            self.group_lookup, self.capture_spots,
+                            self.empty_spots)
+                state = State(self, self.board, self.group_lookup,
+                              self.perspective)
                 self.n_turns += 1
                 reward = 0
                 reset = 0
                 self.perspective *= -1
             # invalid stone
             else:
-                state = State(self, self.perspective)
+                state = State(self, self.board, self.group_lookup,
+                              self.perspective)
                 reward = -max_value
                 reset = 1
         return state, reward, reset_count
@@ -146,69 +243,6 @@ class Session:
             return True
         return False
 
-    def place_stone(self, stone, perspective=None):
-        if not perspective:
-            perspective = self.perspective
-        if self.is_invalid(stone, perspective):
-            return False
-        # create stone group with a single stone
-        group = ({stone}, set())
-        self.group_lookup[stone] = group
-        self.board[stone] = perspective
-        self.empty_spots.remove(stone)
-        # only the adjacent spots of affected
-        for adjacent_spot in get_adjacent(stone):
-            # if there is an adjacent enemy
-            if self.board[adjacent_spot] == -perspective:
-                # look up enemy group
-                enemy_group = self.group_lookup[adjacent_spot]
-                # remove a liberty from their stone group
-                enemy_group[LIBERTIES].remove(stone)
-                # if no more liberties left capture enemy
-                if not enemy_group[LIBERTIES]:
-                    # remove the capture spot from list
-                    self.capture_spots[-perspective].discard(stone)
-                    # recode ko if only one piece was taken
-                    if len(enemy_group[STONES]) == 1:
-                        self.ko = next(iter(enemy_group[STONES]))
-                    else:
-                        self.ko = None
-                    # remove peices
-                    self.empty_spots.update(enemy_group[STONES])
-                    for captured in enemy_group[STONES]:
-                        self.board[captured] = 0
-                        self.group_lookup[captured] = None
-                        # add liberties back to surrounding friendly groups
-                        for released in get_adjacent(captured):
-                            if self.board[released] == perspective:
-                                released_group = self.group_lookup[released]
-                                if len(released_group[LIBERTIES]) == 1:
-                                    self.capture_spots[perspective].discard(
-                                        next(iter(released_group[LIBERTIES])))
-                                released_group[LIBERTIES].add(captured)
-                # if one liberty left, add to capture spots
-                elif len(enemy_group[LIBERTIES]) == 1:
-                    self.capture_spots[-perspective].update(
-                        enemy_group[LIBERTIES])
-            # if friendly group, merge
-            elif self.board[adjacent_spot] == perspective:
-                adjacent_group = self.group_lookup[adjacent_spot]
-                if len(adjacent_group[LIBERTIES]) == 1:
-                    self.capture_spots[perspective].discard(stone)
-                adjacent_group[LIBERTIES].remove(stone)
-                group[STONES].update(adjacent_group[STONES])
-                group[LIBERTIES].update(adjacent_group[LIBERTIES])
-                # update old group to point to new group
-                for adjacent_group_stone in adjacent_group[STONES]:
-                    self.group_lookup[adjacent_group_stone] = group
-            # add liberties if there are free space
-            elif self.board[adjacent_spot] == 0:
-                group[LIBERTIES].add(adjacent_spot)
-        # if only one liberty left add to enemy's capture spots
-        if len(group[LIBERTIES]) == 1:
-            self.capture_spots[perspective].update(group[LIBERTIES])
-        return True
-
     def print_status(self):
         groups = []
         for group in self.group_lookup.flat:
@@ -236,27 +270,30 @@ class Session:
 #------------ The below is required game interface for betazero
 
 
-def get_actions(state):
+#warning, this only works with latest state, due to optomizations
+#that required current session state
+def get_actions(state, include_pass=False):
     # take all empty spots minus the suicidal ones
     action_set = state.session.empty_spots.difference({
         spot
         for spot in state.session.capture_spots[state.perspective]
         if (state.session.is_suicide(spot, state.perspective))
     })
-    # action None is to pass
-    action_set.add(None)
     # can't take back a ko
     if state.session.ko:
         action_set.remove(state.session.ko)
+    # action None is to pass
+    if include_pass or not action_set:
+        action_set.add(None)
     return action_set
 
 
-def predict_action(self, action):
+def predict_action(self, state, action):
     # if turn pass
     if not action:
         # score and end the game when both players pass
         if self.turn_pass:
-            return self.board, score_board(board), self.n_turns + 1
+            return state, score_board(board), self.n_turns + 1
         # continue game otherwise
         return board, 0, 0
     # evaluation
@@ -265,69 +302,46 @@ def predict_action(self, action):
 
 
 class State:
-    def __init__(self, parent, perspective):
+    def __init__(self, session, board, group_lookup, perspective):
+        self.session = session
+        self.board = board
+        self.group_lookup = group_lookup
         self.perspective = perspective
-        if parent is Session:
-            self.session = parent
-            #make frozen copy from session
-            self.board = np.copy(parent.board)
-            self.capture_spots = (None, tuple(session.capture_spots[1]),
-                                  tuple(session.capture_spots[-1]))
-        elif parent is State:
-            #make frozen copy from state
-            self.session = parent.session
-            self.board = np.copy(parent.board)
-            self.capture_spots = parent.capture_spots
 
-    def __neg__(self):
-        return State(self.session, -self.perspective)
+    def flip(self):
+        return State(self.session, self.board, self.group_lookup,
+                     -self.perspective)
 
-    def tobytes():
+    def array(self):
+        return np.array([self.board, self.board])[np.newaxis]
+
+    def key(self):
         return self.board.tobytes()
 
 
-coordinate_swap = (
-    (lambda row, col: (row, col)),
-    (lambda row, col: (-col, row)),
-    (lambda row, col: (row, -col)),
-    (lambda row, col: (-col, -row)),
-    (lambda row, col: (-row, col)),
-    (lambda row, col: (-col, -row)),
-    (lambda row, col: (-row, -col)),
-    (lambda row, col: (col, -row)),
-)
-
-
-def input_transform(state):
-    """Transform an input state to an input format the model requires"""
-    # create capture spots 2d array
-    capture_spots = nd.zeros(state.board.shape, dtype=np.int8)
-    for perspective in (1, -1):
-        for index in state.capture_spots[perspective]:
-            capture_spots[index] = perspective * state.perspective
-    return np.array((state.board, capture_spots))[np.newaxis]
-
-
 session = Session()
-session.place_stone((3, 3), 1)
-session.place_stone((3, 4), -1)
-session.place_stone((2, 3), 1)
-session.place_stone((4, 2), -1)
-session.place_stone((4, 3), 1)
-session.place_stone((1, 4), -1)
-session.place_stone((5, 2), 1)
-session.place_stone((4, 1), -1)
-session.place_stone((3, 2), 1)
-session.place_stone((5, 1), -1)
-session.place_stone((4, 0), 1)
-session.place_stone((5, 3), -1)
-session.place_stone((6, 2), 1)
-session.place_stone((6, 3), -1)
-session.place_stone((6, 1), 1)
-session.place_stone((6, 0), 1)
-session.place_stone((5, 0), 1)
-session.place_stone((3, 1), 1)
+
+place_stone((3, 3), 1, session.board, session.group_lookup, session)
+place_stone((3, 4), -1, session.board, session.group_lookup, session)
+place_stone((2, 3), 1, session.board, session.group_lookup, session)
+place_stone((4, 2), -1, session.board, session.group_lookup, session)
+place_stone((4, 3), 1, session.board, session.group_lookup, session)
+place_stone((1, 4), -1, session.board, session.group_lookup, session)
+place_stone((5, 2), 1, session.board, session.group_lookup, session)
+place_stone((4, 1), -1, session.board, session.group_lookup, session)
+place_stone((3, 2), 1, session.board, session.group_lookup, session)
+place_stone((5, 1), -1, session.board, session.group_lookup, session)
+place_stone((4, 0), 1, session.board, session.group_lookup, session)
+place_stone((5, 3), -1, session.board, session.group_lookup, session)
+place_stone((6, 2), 1, session.board, session.group_lookup, session)
+place_stone((6, 3), -1, session.board, session.group_lookup, session)
+place_stone((6, 1), 1, session.board, session.group_lookup, session)
+place_stone((6, 0), 1, session.board, session.group_lookup, session)
+place_stone((5, 0), 1, session.board, session.group_lookup, session)
+place_stone((3, 1), 1, session.board, session.group_lookup, session)
 session.print_status()
 print(session.get_score(1))
-
-#session.change_perspective()
+state = State(session, session.board, session.group_lookup, 1)
+print(get_actions(state))
+print(liberty_map(session.board, session.group_lookup))
+print(territory_map(session.board, session.group_lookup))
