@@ -52,13 +52,13 @@ def max_pdf(pdfs):
     return max_pdf
 
 
-def symetric_arrays(array, rotational_symetry, vertical_symetry, horizontal_symetry):
+def symetric_arrays(array, rotational_symetry, vertical_symetry,
+                    horizontal_symetry):
     """generate list of symetrically equivalent arrays"""
     symetric_arrays = [array]
     if rotational_symetry:
         symetric_arrays.append(
-        np.rot90(array, axes=(array.ndim - 2, array.ndim - 1))
-        )
+            np.rot90(array, axes=(array.ndim - 2, array.ndim - 1)))
     if vertical_symetry:
         symetric_arrays.extend([
             np.flip(symetric_array, array.ndim - 1)

@@ -65,39 +65,49 @@ win_masks = np.array(
     ]],
     dtype=np.int8).reshape(8, 3 * 3)
 
-
 #------------ The below is required game interface for betazero
 
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    return [action for action, spot in np.ndenumerate(state) if spot == 0]
+    return [
+        action for action, spot in np.ndenumerate(state.board) if spot == 0
+    ]
 
 
 def predict_action(state, action):
     """Returns a tuple consisting of (state_transition, reward, reset_count)."""
     # make buffer
-    state_transition = np.copy(state)
+    state_transition = np.copy(state.board)
     action = tuple(action)
     # invalid action
     if state_transition[action] != 0:
-        return state_transition, -1, 1
+        return State(state_transition), -1, 1
     # apply action
     state_transition[action] = 1
     total_actions = np.count_nonzero(state_transition)
     # win condition
     if np.max(win_masks.dot(state_transition.flat)) == 3:
-        return state_transition, 1, total_actions
+        return State(state_transition), 1, total_actions
     # tie condition
     elif total_actions == 9:
-        return state_transition, 0, 9
+        return State(state_transition), 0, 9
     # not an end condition
-    return state_transition, 0, 0
+    return State(state_transition), 0, 0
 
 
-def input_transform(state):
-    """Transform an input state to an input format the model requires"""
-    return np.array([state])[np.newaxis]
+class State:
+    def __init__(self, board):
+        self.board = board
+
+    def flip(self):
+        return State(-self.board)
+
+    def array(self):
+        return self.board[np.newaxis, np.newaxis]
+
+    def key(self):
+        return self.board.tobytes()
 
 
 class Session:
@@ -105,15 +115,15 @@ class Session:
         self.reset()
 
     def reset(self):
-        self.state = np.zeros((3, 3), dtype=np.int8)
+        self.state = State(np.zeros((3, 3), dtype=np.int8))
         return self.state, 0, 0
 
     def do_action(self, action):
         (state, reward, reset_count) = predict_action(self.state, action)
         if reset_count == 0:
-            self.state = -state
+            self.state = state.flip()
         elif reset_count == 1:
             self.state = state
         else:
             self.reset()
-        return state, reward, reset_count
+        return State(state.board), reward, reset_count

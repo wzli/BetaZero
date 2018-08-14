@@ -19,8 +19,9 @@ class Agent:
             print("Failed to load", model, "-> create new model")
             self.value_model = game.ValueModel()
         # compute constants
-        self.symetric_set_size = ((int(self.game.rotational_symetry) + 1)
-                * (int(self.game.vertical_symetry) + 1) * (int(self.game.horizontal_symetry) + 1))
+        self.symetric_set_size = ((int(self.game.rotational_symetry) + 1) *
+                                  (int(self.game.vertical_symetry) + 1) *
+                                  (int(self.game.horizontal_symetry) + 1))
         # history lists
         self.state_history = []
         self.reward_history = []
@@ -44,7 +45,7 @@ class Agent:
                   for action in actions)))
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(
-            np.vstack((self.game.input_transform(state_transition)
+            np.vstack((state_transition.array()
                        for state_transition in state_transitions)))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
@@ -82,13 +83,14 @@ class Agent:
             raise ValueError("step number < 1")
         # generate input set based on recent history
         training_input_set = np.vstack(
-            self.game.input_transform(input_state)
-            for input_state in self.state_history[-steps:]
-        )
+            input_state.array() for input_state in self.state_history[-steps:])
         self.x_train = training_input_set
         # generate symetric input arrays
-        training_input_set = np.vstack([array for array in symetric_arrays(training_input_set,
-                self.game.rotational_symetry, self.game.vertical_symetry, self.game.horizontal_symetry)])
+        training_input_set = np.vstack([
+            array for array in symetric_arrays(
+                training_input_set, self.game.rotational_symetry,
+                self.game.vertical_symetry, self.game.horizontal_symetry)
+        ])
         # if already at terminal state, there is no future value only rewrad
         if terminal_state or not self.action_prediction_history[-1]:
             training_target_set = [
@@ -109,9 +111,9 @@ class Agent:
                 reversed(self.reward_history[-steps:-1]),
                 reversed(self.action_prediction_history[-steps:-1])):
             action_index = [
-                state_transition.tobytes()
+                state_transition.key()
                 for state_transition in action_predictions[STATE_TRANSITIONS]
-            ].index(chosen_state.tobytes())
+            ].index(chosen_state.key())
             action_predictions[VALUE_PDFS][action_index] = training_target_set[
                 -1]
             # shift pdf to add reward, max_pdf is the pdf equivalent of max()
@@ -125,9 +127,9 @@ class Agent:
         training_target_set = list(reversed(training_target_set))
         self.y_train = training_target_set
         # expand target set to match input set
-        training_target_set = np.vstack(training_target_set * self.symetric_set_size)
+        training_target_set = np.vstack(
+            training_target_set * self.symetric_set_size)
         return training_input_set, training_target_set
-
 
     def update_session(self, state, reward, reset_count):
         if reset_count < 0:
@@ -139,7 +141,7 @@ class Agent:
         # if min max, assumes input state is in opponent's perspective
         # need to change to current player's perspective as input to generate perdictions
         action_predictions = self.generate_predictions(
-            -state if self.game.min_max else state)
+            state.flip() if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
             # if the game resets, train the network
@@ -153,9 +155,8 @@ class Agent:
                                                                             -
                                                                             1]
             # re-predict actions for initial state after training
-            action_predictions = self.generate_predictions(
-                -self.state_history[-1]
-                if self.game.min_max else self.state_history[-1])
+            action_predictions = self.generate_predictions(self.state_history[
+                -1].flip() if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
         elif not self.action_prediction_history[-1]:
             raise ValueError("no more actions but game doesn't reset")

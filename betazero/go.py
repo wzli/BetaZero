@@ -328,6 +328,6 @@ session.place_stone((6, 0), 1)
 session.place_stone((5, 0), 1)
 session.place_stone((3, 1), 1)
 session.print_status()
-print(session.get_score(-1))
+print(session.get_score(1))
 
 #session.change_perspective()
