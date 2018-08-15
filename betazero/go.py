@@ -1,12 +1,15 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
+from keras.layers.normalization import BatchNormalization
+from keras.layers.advanced_activations import LeakyReLU
+
 
 # keras model
 board_size = (7, 7)
 input_dimensions = (2, *board_size)
-output_dimension = 41
-max_value = 20
+output_dimension = 65
+max_value = 32
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
@@ -17,13 +20,22 @@ horizontal_symetry = True
 def ValueModel():
     model = Sequential()
     model.add(
-        Conv2D(
-            32, (3, 3),
-            activation='selu',
+        Conv2D(128, (5, 5),
             input_shape=input_dimensions,
             data_format="channels_first"))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU())
+    model.add(Conv2D(128, (3, 3), data_format="channels_first"))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU())
+    #model.add(Conv2D(128, (3, 3), data_format="channels_first"))
+    #model.add(BatchNormalization())
+    #model.add(LeakyReLU())
+    model.add(Conv2D(2, (1, 1), data_format="channels_first"))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU())
     model.add(Flatten())
-    model.add(Dense(16, activation='selu'))
+    model.add(Dense(128, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
@@ -281,7 +293,7 @@ class Session:
 
 #warning, this only works with latest state, due to optomizations
 #that required current session state
-def get_actions(state, include_pass=False):
+def get_actions(state, include_pass=True):
     session = state.session
     # take all empty spots minus the suicidal ones
     # can't take back a ko
