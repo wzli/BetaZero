@@ -129,7 +129,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
             if not session and enemy_group not in modified_groups:
                 enemy_group = enemy_group.copy(group_lookup, modified_groups)
             # remove a liberty from their stone group
-            enemy_group.liberties.remove(stone)
+            enemy_group.liberties.discard(stone)
             # if no more liberties left capture enemy
             if not enemy_group.liberties:
                 # remove the capture spot from list
@@ -177,16 +177,18 @@ def print_groups(group_lookup):
 
 class Session:
     def __init__(self):
-        self.perspective = 1
         self.reset()
 
     def reset(self):
+        self.perspective = 1
         self.board = np.zeros(board_size, dtype=np.int8)
         self.group_lookup = np.empty(board_size, dtype=object)
         self.empty_spots = {index for index, _ in np.ndenumerate(self.board)}
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
+        self.state = State(self, self.perspective, np.zeros(board_size), np.zeros(board_size))
+        return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
     # otherwise min max tree won't work
@@ -222,10 +224,12 @@ class Session:
                                                   group_lookup)
             elif self.turn_pass:
                 reward = 1
-                reset = n_turns + 1
+                reset = self.n_turns + 1
         liberty_map = generate_liberty_map(board, group_lookup)
         territory_map = generate_territory_map(board, group_lookup)
         state = State(self, perspective, liberty_map, territory_map)
+        if mutable:
+            self.state = State(self, self.perspective, liberty_map, territory_map)
         if reward == 1:
             reward = np.clip(np.sum(territory_map), -max_value,
                              max_value) * perspective
@@ -283,7 +287,7 @@ def get_actions(state, include_pass=False):
     # can't take back a ko
     actions = [
         spot for spot in session.empty_spots if
-        not session.is_suicide(spot, session.perspective) or spot == session.ko
+        not session.is_suicide(spot, state.perspective) and spot != session.ko
     ]
     # action None is to pass
     if include_pass or not actions:
@@ -291,7 +295,7 @@ def get_actions(state, include_pass=False):
     return actions
 
 
-def predict_action(self, state, action):
+def predict_action(state, action):
     return state.session.do_action(action, mutable=False)
 
 
@@ -303,7 +307,7 @@ class State:
         self.territory_map = territory_map
 
     def flip(self):
-        return State(self.session, -self.perspective.board, self.liberty_map,
+        return State(self.session, -self.perspective, self.liberty_map,
                      self.perspective)
 
     def array(self):

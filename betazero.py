@@ -1,10 +1,13 @@
 #usr/bin/python3
+games = ['go', 'tic_tac_toe']
+
 import argparse
-parser = argparse.ArgumentParser(description='BetaZero TicTacToe App')
+parser = argparse.ArgumentParser(description='BetaZero App')
+parser.add_argument('-g', "--game", choices=games, default = 'tic_tac_toe')
 parser.add_argument(
     '-s', '--self-train', action="store_true", help='self training mode')
 parser.add_argument(
-    '-m', '--model', default='model.h5', help='path to the hdf5 model file')
+    '-m', '--model', help='path to the hdf5 model file')
 parser.add_argument(
     '-i',
     '--save-interval',
@@ -16,12 +19,21 @@ args = parser.parse_args()
 import timeit
 import numpy as np
 import matplotlib.pyplot as plt
-from betazero import ai, tic_tac_toe
+from betazero import ai
+
+print("seleted game:", args.game)
+if args.game == games[0]:
+    from betazero import go as game
+elif args.game == games[1]:
+    from betazero import tic_tac_toe as game
+
+if not args.model:
+    args.model = args.game + "_model.h5"
 
 np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
-agent = ai.Agent(tic_tac_toe, args.model)
-session = tic_tac_toe.Session()
+agent = ai.Agent(game, args.model)
+session = game.Session()
 state, reward, reset = session.reset()
 
 if args.self_train:
@@ -32,6 +44,9 @@ if args.self_train:
         agent.update_session(state, reward, reset)
         action = agent.generate_action()
         state, reward, reset = session.do_action(action)
+        if reset == 1:
+            print(state, state.perspective, action)
+            raise ValueError("agent should not generate invalid moves")
         if reset > 2:
             match_count += 1
             save_count_down -= 1
@@ -58,25 +73,29 @@ else:
                 *agent.action_prediction_history[-1], agent.value_samples):
             print(action, action_reward, value_pdf, value_sample)
         if reset > 1:
-            if reward > 0:
-                print(-state, "agent wins")
-            else:
-                print(-state, "tie")
+            print(state.flip())
+            if reward == 0:
+                print("tie", reward)
+            elif reward > 0:
+                print("agent wins", reward)
+            elif reward < 0:
+                print("agent loses", reward)
         agent.update_session(state, reward, reset)
         while True:
             print('\n', session.state)
             try:
-                move_index = [
+                move_index = tuple([
                     int(token) - 1 for token in input(
                         'your turn, enter "row col": ').split(' ')
-                ]
+                ])
             except ValueError:
                 print("integer parsing error")
                 continue
             if len(move_index) != 2:
                 print("invalid index dimension")
                 continue
-            if max(move_index) > 2 or min(move_index) < 0:
+            if (move_index[0] > game.board_size[0] or move_index[0] < 0
+                    or move_index[1] > game.board_size[1] or move_index[1] < 0):
                 print("invalid index range")
                 continue
             state, reward, reset = session.do_action(move_index)
@@ -86,7 +105,9 @@ else:
             else:
                 break
         if reset > 1:
-            if reward > 0:
-                print(state, "you win")
-            else:
-                print(state, "tie")
+            if reward == 0:
+                print("tie", reward)
+            elif reward > 0:
+                print("you win", reward)
+            elif reward < 0:
+                print("you lose", reward)

@@ -4,7 +4,8 @@ from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
 
 # keras model
-input_dimensions = (1, 3, 3)
+board_size = (3, 3)
+input_dimensions = (1, *board_size)
 output_dimension = 3
 max_value = 1
 min_max = True
@@ -17,7 +18,7 @@ def ValueModel():
     model = Sequential()
     model.add(
         Conv2D(
-            32, (3, 3),
+            32, board_size,
             activation='selu',
             input_shape=input_dimensions,
             data_format="channels_first"))
@@ -109,13 +110,16 @@ class State:
     def key(self):
         return self.board.tobytes()
 
+    def __str__(self):
+        return str(self.board)
+
 
 class Session:
     def __init__(self):
         self.reset()
 
     def reset(self):
-        self.state = State(np.zeros((3, 3), dtype=np.int8))
+        self.state = State(np.zeros(board_size, dtype=np.int8))
         return self.state, 0, 0
 
     def do_action(self, action):
