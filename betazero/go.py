@@ -22,16 +22,17 @@ def ValueModel():
     model.add(
         Conv2D(128, (5, 5),
             input_shape=input_dimensions,
+            padding='same',
             data_format="channels_first"))
     model.add(BatchNormalization())
     model.add(LeakyReLU())
-    model.add(Conv2D(128, (3, 3), data_format="channels_first"))
+    model.add(Conv2D(64, (3, 3), data_format="channels_first", padding="same"))
     model.add(BatchNormalization())
     model.add(LeakyReLU())
     #model.add(Conv2D(128, (3, 3), data_format="channels_first"))
     #model.add(BatchNormalization())
     #model.add(LeakyReLU())
-    model.add(Conv2D(2, (1, 1), data_format="channels_first"))
+    model.add(Conv2D(4, (1, 1), data_format="channels_first"))
     model.add(BatchNormalization())
     model.add(LeakyReLU())
     model.add(Flatten())
