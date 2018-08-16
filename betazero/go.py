@@ -1,8 +1,9 @@
 import numpy as np
-from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Flatten
+from keras.models import Model
+from keras.layers import Conv2D, Dense, Flatten, Input
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.merge import Add
 from .utils import ascii_board
 
 
@@ -20,28 +21,32 @@ horizontal_symetry = True
 # used to tie break and compensate white(-1) for first move advantage
 komi = 5.5
 
-# keras model
+# keras model, based alphazero but grossly slimmed down
 def ValueModel():
-    model = Sequential()
-    model.add(
-        Conv2D(128, (5, 5),
-            input_shape=input_dimensions,
-            padding='same',
-            data_format="channels_first"))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU())
-    model.add(Conv2D(64, (3, 3), data_format="channels_first", padding="same"))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU())
-    #model.add(Conv2D(128, (3, 3), data_format="channels_first"))
-    #model.add(BatchNormalization())
-    #model.add(LeakyReLU())
-    model.add(Conv2D(4, (1, 1), data_format="channels_first"))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU())
-    model.add(Flatten())
-    model.add(Dense(128, activation='selu'))
-    model.add(Dense(output_dimension, activation='softmax'))
+    filter_size = (3, 3)
+    n_filters = 64
+    n_res_blocks = 3
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(inputs)
+    x = BatchNormalization()(x)
+    x = LeakyReLU()(x)
+    # residual blocks
+    for i in range(n_res_blocks):
+        x_in = x
+        x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+        x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(x)
+        x = BatchNormalization()(x)
+        x = Add()([x, x_in])
+        x = LeakyReLU()(x)
+    x = Conv2D(1, (1, 1), padding='same', data_format="channels_first")(x)
+    x = BatchNormalization()(x)
+    x = LeakyReLU()(x)
+    x = Flatten()(x)
+    x = Dense(n_filters, activation='selu')(x)
+    outputs = Dense(output_dimension, activation='softmax')(x)
+    model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
