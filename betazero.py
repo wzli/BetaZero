@@ -3,11 +3,10 @@ games = ['go', 'tic_tac_toe']
 
 import argparse
 parser = argparse.ArgumentParser(description='BetaZero App')
-parser.add_argument('-g', "--game", choices=games, default = 'tic_tac_toe')
+parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
 parser.add_argument(
     '-s', '--self-train', action="store_true", help='self training mode')
-parser.add_argument(
-    '-m', '--model', help='path to the hdf5 model file')
+parser.add_argument('-m', '--model', help='path to the hdf5 model file')
 parser.add_argument(
     '-i',
     '--save-interval',
@@ -52,7 +51,10 @@ if args.self_train:
             if save_count_down == 0:
                 agent.value_model.save(args.model)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
-                    print(x[0], y, "turn", i+1)
+                    print(x[0], y, "expected value",
+                          round(game.max_value * (
+                              (np.average(np.arange(y.shape[0]), weights=y) /
+                               game.output_dimension)) - 0.5), "turn", i + 1)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 save_time = timeit.default_timer()
@@ -89,7 +91,8 @@ else:
                 print("invalid index dimension")
                 continue
             if (move_index[0] > game.board_size[0] or move_index[0] < 0
-                    or move_index[1] > game.board_size[1] or move_index[1] < 0):
+                    or move_index[1] > game.board_size[1]
+                    or move_index[1] < 0):
                 print("invalid index range")
                 continue
             state, reward, reset = session.do_action(move_index)

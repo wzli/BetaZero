@@ -145,7 +145,8 @@ class Agent:
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
             # if the game resets, train the network
-            x_train, y_train = self.generate_training_set(reset_count, self.game.terminal_state)
+            x_train, y_train = self.generate_training_set(
+                reset_count, self.game.terminal_state)
             self.value_model.fit(x_train, y_train, verbose=0)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]

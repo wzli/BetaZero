@@ -6,7 +6,6 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import Add
 from .utils import ascii_board
 
-
 # keras model
 board_size = (7, 7)
 input_dimensions = (2, *board_size)
@@ -19,22 +18,33 @@ horizontal_symetry = True
 # end state of the game may not nessesaily be terminal nodes in the state tree
 terminal_state = False
 
+
 # keras model, based alphazero but grossly slimmed down
 def ValueModel():
     filter_size = (3, 3)
     n_filters = 128
     n_res_blocks = 10
     inputs = Input(shape=input_dimensions)
-    x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(inputs)
+    x = Conv2D(
+        n_filters, filter_size, padding='same',
+        data_format="channels_first")(inputs)
     x = BatchNormalization()(x)
     x = LeakyReLU()(x)
     # residual blocks
     for i in range(n_res_blocks):
         x_in = x
-        x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(x)
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            data_format="channels_first")(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
-        x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(x)
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            data_format="channels_first")(x)
         x = BatchNormalization()(x)
         x = Add()([x, x_in])
         x = LeakyReLU()(x)
@@ -70,13 +80,15 @@ def generate_liberty_map(board, group_lookup):
         group_lookup)
 
 
-def generate_territory_map(board, itterations = max(board_size)//2 + 1, threshold = 3):
+def generate_territory_map(board,
+                           itterations=max(board_size) // 2 + 1,
+                           threshold=3):
     for i in range(itterations):
         buf = board * threshold
         buf[1:] += board[:-1]  # add North
         buf[:-1] += board[1:]  # add South
-        buf[:,1:] += board[:,:-1]  # add West
-        buf[:,:-1] += board[:,1:]  # add East
+        buf[:, 1:] += board[:, :-1]  # add West
+        buf[:, :-1] += board[:, 1:]  # add East
         board = np.sign(buf)
     return board
 
@@ -181,7 +193,8 @@ class Session:
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, self.perspective, np.zeros(board_size), np.zeros(board_size))
+        self.state = State(self, self.perspective, np.zeros(board_size),
+                           np.zeros(board_size))
         return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
@@ -223,7 +236,8 @@ class Session:
         territory_map = generate_territory_map(board)
         state = State(self, perspective, liberty_map, territory_map)
         if mutable:
-            self.state = State(self, self.perspective, liberty_map, territory_map)
+            self.state = State(self, self.perspective, liberty_map,
+                               territory_map)
         if reward == 1:
             reward = np.clip(np.sum(territory_map), -max_value,
                              max_value) * perspective
