@@ -9,13 +9,16 @@ from .utils import ascii_board
 # keras model
 board_size = (7, 7)
 input_dimensions = (2, *board_size)
-output_dimension = 65
-max_value = 32
+#either win or lose +1/-1
+output_dimension = 2
+max_value = 1
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
 
+# used to tie break and compensate white(-1) for first move advantage
+komi = 5.5
 
 # keras model
 def ValueModel():
@@ -218,7 +221,7 @@ class Session:
         if mutable:
             self.state = State(self, self.perspective, liberty_map, territory_map)
         if reward == 1:
-            reward = np.clip(np.sum(territory_map), -max_value,
+            reward = np.clip(np.sum(territory_map) - komi, -max_value,
                              max_value) * perspective
         return state, reward, reset
 

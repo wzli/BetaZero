@@ -18,7 +18,6 @@ args = parser.parse_args()
 
 import timeit
 import numpy as np
-import matplotlib.pyplot as plt
 from betazero import ai
 
 print("seleted game:", args.game)
@@ -53,17 +52,11 @@ if args.self_train:
             if save_count_down == 0:
                 agent.value_model.save(args.model)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
-                    print(x[0], y, i)
+                    print(x[0], y, "turn", i+1)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 save_time = timeit.default_timer()
                 save_count_down = args.save_interval
-                continue
-
-                for i, pdf in enumerate(agent.y_train):
-                    plt.plot(pdf, label=str(i))
-                plt.legend()
-                plt.show()
 else:
     while True:
         agent.update_session(state, reward, reset)

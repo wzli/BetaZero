@@ -6,7 +6,7 @@ from .utils import ascii_board
 
 # keras model
 board_size = (3, 3)
-input_dimensions = board_size
+input_dimensions = (1, *board_size)
 output_dimension = 3
 max_value = 1
 min_max = True
@@ -102,7 +102,7 @@ class State:
         return State(-self.board)
 
     def array(self):
-        return self.board[np.newaxis]
+        return self.board[np.newaxis, np.newaxis]
 
     def key(self):
         return self.board.tobytes()
