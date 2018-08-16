@@ -62,34 +62,15 @@ def generate_liberty_map(board, group_lookup):
         group_lookup)
 
 
-def generate_territory_map(board, group_lookup):
-    territory_map = np.copy(board)
-    frontier = set()
-    # start from the borders of each stone group
-    for group in {group for group in group_lookup.flat if group}:
-        frontier.update(group.liberties)
-    # itteratively convert empty spots to their adjacent majority
-    conversions = []
-    while frontier:
-        next_frontier = set()
-        for spot in frontier:
-            adjacent_spots = get_adjacent(spot)
-            majority = np.sign(
-                sum((territory_map[adjacent_spot]
-                     for adjacent_spot in adjacent_spots)))
-            if majority != 0:
-                conversions.append((spot, majority))
-                next_frontier.update({
-                    adjacent_spot
-                    for adjacent_spot in adjacent_spots
-                    if territory_map[adjacent_spot] == 0
-                    and adjacent_spot not in frontier
-                })
-        for spot, majority in conversions:
-            territory_map[spot] = majority
-        conversions.clear()
-        frontier = next_frontier
-    return territory_map
+def generate_territory_map(board, itterations = max(board_size)//2 + 1, threshold = 3):
+    for i in range(itterations):
+        buf = board * threshold
+        buf[1:] += board[:-1]  # add North
+        buf[:-1] += board[1:]  # add South
+        buf[:,1:] += board[:,:-1]  # add West
+        buf[:,:-1] += board[:,1:]  # add East
+        board = np.sign(buf)
+    return board
 
 
 class StoneGroup:
@@ -239,7 +220,7 @@ class Session:
                 reward = 1
                 reset = self.n_turns + 1
         liberty_map = generate_liberty_map(board, group_lookup)
-        territory_map = generate_territory_map(board, group_lookup)
+        territory_map = generate_territory_map(board)
         state = State(self, perspective, liberty_map, territory_map)
         if mutable:
             self.state = State(self, self.perspective, liberty_map, territory_map)
