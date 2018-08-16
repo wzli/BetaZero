@@ -10,9 +10,8 @@ from .utils import ascii_board
 # keras model
 board_size = (7, 7)
 input_dimensions = (2, *board_size)
-#either win or lose +1/-1
-output_dimension = 2
-max_value = 1
+output_dimension = board_size[0] * board_size[1] * 2 + 1
+max_value = board_size[0] * board_size[1]
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
@@ -20,14 +19,11 @@ horizontal_symetry = True
 # end state of the game may not nessesaily be terminal nodes in the state tree
 terminal_state = False
 
-# used to tie break and compensate white(-1) for first move advantage
-komi = 5.5
-
 # keras model, based alphazero but grossly slimmed down
 def ValueModel():
     filter_size = (3, 3)
-    n_filters = 64
-    n_res_blocks = 3
+    n_filters = 128
+    n_res_blocks = 10
     inputs = Input(shape=input_dimensions)
     x = Conv2D(n_filters, filter_size, padding='same', data_format="channels_first")(inputs)
     x = BatchNormalization()(x)
@@ -42,14 +38,15 @@ def ValueModel():
         x = BatchNormalization()(x)
         x = Add()([x, x_in])
         x = LeakyReLU()(x)
-    x = Conv2D(1, (1, 1), padding='same', data_format="channels_first")(x)
+    x = Conv2D(2, (1, 1), padding='same', data_format="channels_first")(x)
     x = BatchNormalization()(x)
     x = LeakyReLU()(x)
     x = Flatten()(x)
-    x = Dense(n_filters, activation='selu')(x)
+    x = Dense(1024, activation='selu')(x)
     outputs = Dense(output_dimension, activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
+    print(model.summary())
     return model
 
 
@@ -228,7 +225,7 @@ class Session:
         if mutable:
             self.state = State(self, self.perspective, liberty_map, territory_map)
         if reward == 1:
-            reward = np.clip(np.sum(territory_map) - komi, -max_value,
+            reward = np.clip(np.sum(territory_map), -max_value,
                              max_value) * perspective
         return state, reward, reset
 
