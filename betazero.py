@@ -69,9 +69,10 @@ else:
         agent.update_session(state, reward, reset)
         action = agent.generate_action(explore=True)
         state, reward, reset = session.do_action(action)
-        for action, _, action_reward, _, value_pdf, value_sample in zip(
+        for action_choice, _, action_reward, _, value_pdf, value_sample in zip(
                 *agent.action_prediction_history[-1], agent.value_samples):
-            print(action, action_reward, value_pdf, value_sample)
+            print(action_choice, action_reward, value_pdf, value_sample)
+        print("agent played", [i + 1 for i in action])
         if reset > 1:
             print(state.flip())
             if reward == 0:

@@ -3,6 +3,7 @@ from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
+from .utils import ascii_board
 
 
 # keras model
@@ -152,14 +153,6 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
         elif board[adjacent_spot] == 0:
             group.liberties.add(adjacent_spot)
     return board, group_lookup
-
-
-def ascii_board(board):
-    ascii_board = np.chararray(board.shape)
-    ascii_board[board == 0] = ' '
-    ascii_board[board > 0] = 'X'
-    ascii_board[board < 0] = 'O'
-    return ascii_board.decode('utf-8')
 
 
 def print_groups(group_lookup):

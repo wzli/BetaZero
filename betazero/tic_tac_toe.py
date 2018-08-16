@@ -2,6 +2,7 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Conv2D, Dense, Flatten
+from .utils import ascii_board
 
 # keras model
 board_size = (3, 3)
@@ -111,7 +112,7 @@ class State:
         return self.board.tobytes()
 
     def __str__(self):
-        return str(self.board)
+        return str(ascii_board(self.board))
 
 
 class Session:

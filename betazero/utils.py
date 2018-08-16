@@ -70,3 +70,16 @@ def symetric_arrays(array, rotational_symetry, vertical_symetry,
             for symetric_array in symetric_arrays
         ])
     return symetric_arrays
+
+
+def ascii_board(board, perspective = 1):
+    full_ascii_board = np.chararray((board.shape[0] + 1, board.shape[1] + 1))
+    full_ascii_board[0,:] = np.char.mod('%d', np.arange(board.shape[0] + 1))
+    full_ascii_board[:,0] = np.char.mod('%d', np.arange(board.shape[1] + 1))
+    full_ascii_board[0,0] = ' '
+    ascii_board = full_ascii_board[1:, 1:]
+    board *= perspective
+    ascii_board[board == 0] = ' '
+    ascii_board[board > 0] = 'X'
+    ascii_board[board < 0] = 'O'
+    return full_ascii_board.decode('utf-8')
