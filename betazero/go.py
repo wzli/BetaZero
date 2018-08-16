@@ -17,6 +17,8 @@ min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
+# end state of the game may not nessesaily be terminal nodes in the state tree
+terminal_state = False
 
 # used to tie break and compensate white(-1) for first move advantage
 komi = 5.5

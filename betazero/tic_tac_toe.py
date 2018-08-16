@@ -13,6 +13,8 @@ min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
+# end states of the game may corresponds to terminal nodes in the state tree
+terminal_state = True
 
 
 #simple fully connected network
