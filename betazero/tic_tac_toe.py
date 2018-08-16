@@ -6,7 +6,7 @@ from .utils import ascii_board
 
 # keras model
 board_size = (3, 3)
-input_dimensions = (1, *board_size)
+input_dimensions = board_size
 output_dimension = 3
 max_value = 1
 min_max = True
@@ -15,15 +15,11 @@ vertical_symetry = True
 horizontal_symetry = True
 
 
+#simple fully connected network
 def ValueModel():
     model = Sequential()
-    model.add(
-        Conv2D(
-            32, board_size,
-            activation='selu',
-            input_shape=input_dimensions,
-            data_format="channels_first"))
-    model.add(Flatten())
+    model.add(Flatten(input_shape=input_dimensions))
+    model.add(Dense(32, activation='selu'))
     model.add(Dense(16, activation='selu'))
     model.add(Dense(output_dimension, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -106,7 +102,7 @@ class State:
         return State(-self.board)
 
     def array(self):
-        return self.board[np.newaxis, np.newaxis]
+        return self.board[np.newaxis]
 
     def key(self):
         return self.board.tobytes()
