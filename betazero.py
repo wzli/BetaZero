@@ -52,9 +52,8 @@ if args.self_train:
                 agent.value_model.save(args.model)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
                     print(x[0], y, "expected value",
-                          round(game.max_value * (
-                              (np.average(np.arange(y.shape[0]), weights=y) /
-                               game.output_dimension)) - 0.5), "turn", i + 1)
+                          np.average(np.arange(y.shape[0]), weights=y) /
+                          y.shape[0], "turn", i + 1)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 save_time = timeit.default_timer()
