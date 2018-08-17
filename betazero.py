@@ -18,6 +18,7 @@ args = parser.parse_args()
 import timeit
 import numpy as np
 from betazero import ai
+from betazero.utils import expected_value, parse_grid_input
 
 print("seleted game:", args.game)
 if args.game == games[0]:
@@ -51,9 +52,11 @@ if args.self_train:
             if save_count_down == 0:
                 agent.value_model.save(args.model)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
-                    print(x[0], y, "expected value",
-                          np.average(np.arange(y.shape[0]), weights=y) /
-                          y.shape[0], "turn", i + 1)
+                    expected, variance = expected_value(y, True)
+                    expected = round(2 * game.max_value * (expected - 0.5), 3)
+                    deviation = round(2 * game.max_value * (variance**0.5), 3)
+                    print(x[0], y, "expected value", expected, "deviation",
+                          deviation, "turn", i + 1)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 save_time = timeit.default_timer()
@@ -65,45 +68,35 @@ else:
         state, reward, reset = session.do_action(action)
         for action_choice, _, action_reward, _, value_pdf, value_sample in zip(
                 *agent.action_prediction_history[-1], agent.value_samples):
-            print(action_choice, action_reward, value_pdf, value_sample)
+            expected, variance = expected_value(value_pdf, True)
+            expected = round(expected, 3)
+            deviation = round(variance**0.5, 3)
+            print('A:', action_choice, '\tR:', action_reward, '\tS:',
+                  value_sample, '\tP:', value_pdf, '\tE:', expected, '  D:',
+                  deviation)
         print("agent played", [i + 1 for i in action])
         if reset > 1:
             print(state.flip())
             if reward == 0:
-                print("tie", reward)
+                print("tie")
             elif reward > 0:
-                print("agent wins", reward)
+                print("agent wins, score", reward)
             elif reward < 0:
-                print("agent loses", reward)
+                print("agent loses, score", reward)
         agent.update_session(state, reward, reset)
         while True:
             print('\n', session.state)
-            try:
-                move_index = tuple([
-                    int(token) - 1 for token in input(
-                        'your turn, enter "row col": ').split(' ')
-                ])
-            except ValueError:
-                print("integer parsing error")
-                continue
-            if len(move_index) != 2:
-                print("invalid index dimension")
-                continue
-            if (move_index[0] > game.board_size[0] or move_index[0] < 0
-                    or move_index[1] > game.board_size[1]
-                    or move_index[1] < 0):
-                print("invalid index range")
-                continue
+            move_index = parse_grid_input(game.board_size)
             state, reward, reset = session.do_action(move_index)
             if reset == 1:
-                print("already occupied")
+                print("INVALID ACTION")
                 continue
             else:
                 break
         if reset > 1:
             if reward == 0:
-                print("tie", reward)
+                print("tie")
             elif reward > 0:
-                print("you win", reward)
+                print("you win score", reward)
             elif reward < 0:
-                print("you lose", reward)
+                print("you lose score", reward)

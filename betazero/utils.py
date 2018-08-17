@@ -52,6 +52,15 @@ def max_pdf(pdfs):
     return max_pdf
 
 
+def expected_value(pdf, return_variance=False):
+    support = np.arange(pdf.shape[-1]) / (pdf.shape[-1] - 1)
+    expected = np.average(support, weights=pdf)
+    if not return_variance:
+        return expected
+    variance = np.average(support**2, weights=pdf) - expected**2
+    return expected, variance
+
+
 def symetric_arrays(array, rotational_symetry, vertical_symetry,
                     horizontal_symetry):
     """generate list of symetrically equivalent arrays"""
@@ -83,3 +92,23 @@ def ascii_board(board, perspective=1):
     ascii_board[board > 0] = 'X'
     ascii_board[board < 0] = 'O'
     return full_ascii_board.decode('utf-8')
+
+
+def parse_grid_input(board_size):
+    while True:
+        try:
+            move_index = tuple([
+                int(token) - 1 for token in input(
+                    'your turn, enter "row col ...": ').split(' ')
+            ])
+        except ValueError:
+            print("INTEGER PARSING ERROR")
+            continue
+        if len(move_index) != len(board_size):
+            print("INVALID INDEX DIMENSION")
+            continue
+        if any((i < 0 or i >= axis_len
+                for i, axis_len in zip(move_index, board_size))):
+            print("INVALID INDEX RANGE")
+            continue
+        return move_index
