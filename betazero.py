@@ -55,7 +55,7 @@ if args.self_train:
                     expected, variance = expected_value(y, True)
                     expected = round(2 * game.max_value * (expected - 0.5), 3)
                     deviation = round(2 * game.max_value * (variance**0.5), 3)
-                    print(x[0], y, "expected value", expected, "deviation",
+                    print(x[0], "expected value", expected, "deviation",
                           deviation, "turn", i + 1)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
@@ -66,13 +66,14 @@ else:
         agent.update_session(state, reward, reset)
         action = agent.generate_action(explore=True)
         state, reward, reset = session.do_action(action)
-        for action_choice, _, action_reward, _, value_pdf, value_sample in zip(
-                *agent.action_prediction_history[-1], agent.value_samples):
+
+        for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(zip(
+                *agent.action_prediction_history[-1], agent.value_samples), key = lambda x: x[-1]):
             expected, variance = expected_value(value_pdf, True)
             expected = round(expected, 3)
             deviation = round(variance**0.5, 3)
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
-                  value_sample, '\tP:', value_pdf, '\tE:', expected, '  D:',
+                  value_sample, '\tE:', expected, '  D:',
                   deviation)
         print("agent played", [i + 1 for i in action])
         if reset > 1:
