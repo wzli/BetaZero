@@ -13,15 +13,18 @@ parser.add_argument(
     type=int,
     default=1000,
     help='save model every i matches')
+parser.add_argument('-p', '--plot', action="store_true", help='generate value distribution plots')
 args = parser.parse_args()
 
 import timeit
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from betazero import ai
 from betazero.utils import expected_value, parse_grid_input
+
+if args.plot:
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
 
 print("seleted game:", args.game)
 if args.game == games[0]:
@@ -60,11 +63,14 @@ if args.self_train:
                     deviation = round(2 * game.max_value * (variance**0.5), 3)
                     print(x[0], "expected value", expected, "deviation",
                           deviation, "turn", i + 1)
-                    plt.plot(y, label=i)
+                    if args.plot:
+                        plt.plot(y, label=i)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 save_count_down = args.save_interval
-                plt.savefig(args.game + "_value_pdf.png")
+                if args.plot:
+                    plt.savefig(args.game + "_match_"+ str(match_count) +"_value_pdf.png")
+                    plt.clf()
                 save_time = timeit.default_timer()
 else:
     while True:
