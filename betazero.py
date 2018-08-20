@@ -72,14 +72,14 @@ else:
         action = agent.generate_action(explore=True)
         state, reward, reset = session.do_action(action)
 
-        for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(zip(
-                *agent.action_prediction_history[-1], agent.value_samples), key = lambda x: x[-1]):
+        for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
+                zip(*agent.action_prediction_history[-1], agent.value_samples),
+                key=lambda x: x[-1]):
             expected, variance = expected_value(value_pdf, True)
             expected = round(expected, 3)
             deviation = round(variance**0.5, 3)
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
-                  value_sample, '\tE:', expected, '  D:',
-                  deviation)
+                  value_sample, '\tE:', expected, '  D:', deviation)
         print("agent played", [i + 1 for i in action])
         if reset > 1:
             print(state.flip())

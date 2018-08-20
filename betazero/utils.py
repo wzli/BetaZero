@@ -85,7 +85,7 @@ def ascii_board(board, perspective=1):
     full_ascii_board = np.chararray((board.shape[0] + 1, board.shape[1] + 1))
     full_ascii_board[0, :] = np.char.mod('%d', np.arange(board.shape[0] + 1))
     full_ascii_board[:, 0] = np.char.mod('%d', np.arange(board.shape[1] + 1))
-    full_ascii_board[0, 0] = '.'
+    full_ascii_board[0, 0] = ''
     ascii_board = full_ascii_board[1:, 1:]
     board *= perspective
     ascii_board[board == 0] = '.'
