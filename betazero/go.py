@@ -7,10 +7,10 @@ from keras.layers.merge import Add
 from .utils import ascii_board
 
 # keras model
-board_size = (7, 7)
+board_size = (5, 5)
 input_dimensions = (2, *board_size)
-output_dimension = board_size[0] * board_size[1] * 2 + 1
-max_value = board_size[0] * board_size[1]
+output_dimension = 2
+max_value = 1
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
@@ -48,11 +48,11 @@ def ValueModel():
         x = BatchNormalization()(x)
         x = Add()([x, x_in])
         x = LeakyReLU()(x)
-    x = Conv2D(2, (1, 1), padding='same', data_format="channels_first")(x)
+    x = Conv2D(1, (1, 1), padding='same', data_format="channels_first")(x)
     x = BatchNormalization()(x)
     x = LeakyReLU()(x)
     x = Flatten()(x)
-    x = Dense(1024, activation='selu')(x)
+    x = Dense(n_filters, activation='selu')(x)
     outputs = Dense(output_dimension, activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
@@ -127,6 +127,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
     # create stone group with a single stone
     group = StoneGroup({stone})
     if session:
+        session.ko = None
         session.empty_spots.remove(stone)
     else:
         modified_groups = {group}
@@ -149,8 +150,8 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
                 # remove the capture spot from list
                 if session:
                     # recode ko if only one piece was taken
-                    session.ko = adjacent_spot if len(
-                        enemy_group.stones) == 1 else None
+                    if len(enemy_group.stones) == 1:
+                        session.ko = adjacent_spot
                     session.empty_spots.update(enemy_group.stones)
                 # remove peices
                 for captured in enemy_group.stones:
