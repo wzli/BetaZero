@@ -1,9 +1,11 @@
 import numpy as np
 from keras.models import Model
-from keras.layers import Conv2D, Dense, Flatten, Input
+from keras import regularizers
+from keras.layers import Conv2D, Dense, Flatten, Input, ReLU, DepthwiseConv2D, GlobalAveragePooling2D
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import Add
+#from keras.applications.mobilenet_v2
 from .utils import ascii_board
 
 # keras model
@@ -20,7 +22,7 @@ terminal_state = False
 
 
 # keras model, based alphazero but grossly slimmed down
-def ValueModel():
+def _ValueModel():
     filter_size = (3, 3)
     n_filters = 128
     n_res_blocks = 10
@@ -54,6 +56,42 @@ def ValueModel():
     x = Flatten()(x)
     x = Dense(n_filters, activation='selu')(x)
     outputs = Dense(output_dimension, activation='softmax')(x)
+    model = Model(inputs, outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    print(model.summary())
+    return model
+
+
+def ValueModel():
+    n_filters = 128
+    expansion_factor = 5
+    n_res_blocks = 15
+    batch_norm_momentum = 0.999
+    l2_reg = 1e-4
+
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(n_filters, (3, 3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg), data_format='channels_first')(inputs)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    for i in range(n_res_blocks):
+        x_in = x
+        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg), data_format='channels_first')(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6.)(x)
+        x = DepthwiseConv2D((3,3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg), data_format='channels_first')(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6.)(x)
+        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg), data_format='channels_first')(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = Add()([x, x_in])
+    x = Conv2D(2 * n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg), data_format='channels_first')(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = DepthwiseConv2D((3,3), padding='valid', strides=2, use_bias=False, kernel_regularizer=regularizers.l2(l2_reg),  data_format='channels_first')(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = GlobalAveragePooling2D(data_format='channels_first')(x)
+    outputs = Dense(output_dimension, kernel_regularizer=regularizers.l2(l2_reg), activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     print(model.summary())
