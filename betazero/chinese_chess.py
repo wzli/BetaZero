@@ -17,28 +17,43 @@ class Piece:
         pieces[player].add(self)
 
     def is_across_river(self, move=None):
-        col = move[0] if move else self.location[0]
-        return ((col - 4.5) * self.player) > 0
+        row = move[0] if move else self.location[0]
+        return ((row - 4.5) * self.player) > 0
+
+    def is_in_palace(self, move=None):
+        row, col = move if move else self.location
+        return ((row - 4.5) * self.player) < -2 and col > 2 and col < 6
 
     def is_valid(self, move):
-        return is_within_bounds(move) and self.board[move] != self.player
+        if not is_within_bounds(move):
+            return False
+        if self.board[move] and self.board[move].player == self.player:
+            return False
+        return True
 
-    def move(self, move, mutable=True):
+    def move(self, move):
+        reward = 0
         if self.board[move]:
+            reward = self.board[move].reward
             self.peices[-self.player].remove(self.board[move])
         self.board[move] = self
         self.board[self.location] = None
         self.location = move
-        return self.board
+        return self.board, reward
 
     def test(self, move):
         board = np.copy(self.board)
+        reward = board[move].reward if board[move] else 0
         board[move] = self
         board[self.location] = None
-        return board
+        return board, reward
 
 
 class Pawn(Piece):
+    @property
+    def reward(self):
+        return 2 if self.is_across_river() else 1
+
     def get_moves(self):
         row, col = self.location
         moves = [(row + self.player, col)]
@@ -52,7 +67,47 @@ class Pawn(Piece):
         return 'P' if self.player > 0 else 'p'
 
 
+class Guard(Piece):
+    reward = 2
+
+    def get_moves(self):
+        row, col = self.location
+        return [
+            move for move in ((row + 1, col + 1), (row + 1, col - 1),
+                              (row - 1, col + 1), (row - 1, col - 1))
+            if self.is_valid(move) and self.is_in_palace(move)
+        ]
+
+    def __str__(self):
+        return 'G' if self.player > 0 else 'g'
+
+
+class King(Piece):
+    reward = 50
+
+    def get_moves(self):
+        row, col = self.location
+        moves = [
+            move for move in ((row, col + 1), (row, col - 1),
+                              (row + 1, col), (row - 1, col))
+            if self.is_valid(move) and self.is_in_palace(move)
+        ]
+        col += self.player
+        while is_within_bounds((row,col)):
+            if self.board[row,col]:
+                if isinstance(self.board[(row, col)], King):
+                    moves.append((row,col))
+                break
+            col += self.player
+        return moves
+
+    def __str__(self):
+        return 'Q' if self.player > 0 else 'q'
+
+
 class Bishop(Piece):
+    reward = 2
+
     def get_moves(self):
         row, col = self.location
         return [
@@ -65,22 +120,101 @@ class Bishop(Piece):
         return 'B' if self.player > 0 else 'b'
 
 
+class Knight(Piece):
+    reward = 4
+
+    def get_moves(self):
+        row, col = self.location
+        moves = []
+        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
+            if is_within_bounds((row + d_row, col + d_col)) and not self.board[row + d_row, col + d_col]:
+                moves.extend([move for move in (
+                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
+                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
+                    ) if self.is_valid(move)])
+        return moves
+
+    def __str__(self):
+        return 'K' if self.player > 0 else 'k'
+
+
+class Rook(Piece):
+    reward = 9
+
+    def get_moves(self):
+        row, col = self.location
+        moves = []
+        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
+            move = (row + d_row, col + d_col)
+            while self.is_valid(move):
+                moves.append(move)
+                if self.board[move]:
+                    break
+                move = (move[0] + d_row, move[1] + d_col)
+        return moves
+
+    def __str__(self):
+        return 'R' if self.player > 0 else 'r'
+
+
+class Cannon(Piece):
+    reward = 4.5
+
+    def get_moves(self):
+        row, col = self.location
+        moves = []
+        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
+            move = (row + d_row, col + d_col)
+            while is_within_bounds(move) and not self.board[move]:
+                moves.append(move)
+                move = (move[0] + d_row, move[1] + d_col)
+            move = (move[0] + d_row, move[1] + d_col)
+            while is_within_bounds(move):
+                if self.board[move]:
+                    if self.board[move].player == -self.player:
+                        moves.append(move)
+                    break
+                move = (move[0] + d_row, move[1] + d_col)
+        return moves
+
+    def __str__(self):
+        return 'C' if self.player > 0 else 'c'
+
+
 default_spawn = (None, (
     (Pawn, (3, 0)),
     (Pawn, (3, 2)),
     (Pawn, (3, 4)),
     (Pawn, (3, 6)),
     (Pawn, (3, 8)),
+    (Rook, (0, 0)),
+    (Rook, (0, 8)),
+    (Cannon, (2, 1)),
+    (Cannon, (2, 7)),
+    (Knight, (0, 1)),
+    (Knight, (0, 7)),
     (Bishop, (0, 2)),
     (Bishop, (0, 6)),
+    (Guard, (0, 3)),
+    (Guard, (0, 5)),
+    (King, (0, 4)),
 ), (
     (Pawn, (6, 0)),
     (Pawn, (6, 2)),
     (Pawn, (6, 4)),
     (Pawn, (6, 6)),
     (Pawn, (6, 8)),
+    (Rook, (9, 0)),
+    (Rook, (9, 8)),
+    (Cannon, (7, 1)),
+    (Cannon, (7, 7)),
+    (Knight, (9, 1)),
+    (Knight, (9, 7)),
     (Bishop, (9, 2)),
     (Bishop, (9, 6)),
+    (Guard, (9, 3)),
+    (Guard, (9, 5)),
+    (King, (9, 4)),
 ))
 
 
@@ -115,7 +249,7 @@ class State:
             tuple(
                 np.vectorize(
                     lambda x: x.player * self.player if isinstance(x, piece) else 0
-                )(self.board) for piece in (Pawn, Bishop)))[np.newaxis]
+                )(self.board) for piece in (Pawn, Rook, Cannon, Knight, Bishop, Guard, King)))[np.newaxis]
 
     def key(self):
         return self.board.tobytes()
@@ -138,16 +272,9 @@ def predict_action(state, action):
 
 session = Session()
 
-for row in session.board:
-    print(*(piece if piece else '·' for piece in row))
-
-for piece in session.pieces[1]:
-    print(piece.get_moves(), piece)
-
 state = State(session, session.board, 1)
 
-for action in get_actions(state):
-    print(action)
+for piece, move in get_actions(state):
+    print(piece, piece.location, move)
 
 print(state)
-print(state.array())
