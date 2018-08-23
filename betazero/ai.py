@@ -67,7 +67,7 @@ class Agent:
             value_sample = lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), weights=value_pdf)
         value_samples = np.array([
             value_sample(value_pdf) if reset_count == 0 else value_to_index(
-                reward / self.game.max_value, self.game.output_dimension)
+                reward / self.game.max_value, value_pdf.shape[-1])
             for value_pdf, reward, reset_count in zip(value_pdfs, rewards,
                                                       reset_counts)
         ])
@@ -95,7 +95,7 @@ class Agent:
         if terminal_state or not self.action_prediction_history[-1]:
             training_target_set = [
                 one_hot_pdf(self.reward_history[-1] / self.game.max_value,
-                            self.game.output_dimension)
+                            int(self.value_model.layers[-1].output.shape[-1]))
             ]
         else:
             training_target_set = [
