@@ -159,5 +159,10 @@ class Agent:
             action_predictions = self.generate_predictions(self.state_history[
                 -1].flip() if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
+        elif reward != 0 and self.game.reward_span > 1:
+            # reward received, train the network
+            x_train, y_train = self.generate_training_set(
+                self.game.reward_span, False)
+            self.value_model.fit(x_train, y_train, verbose=0)
         elif not self.action_prediction_history[-1]:
             raise ValueError("no more actions but game doesn't reset")

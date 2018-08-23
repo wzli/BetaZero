@@ -28,9 +28,15 @@ def shift_pdf(pdf, value):
     else:
         shifted_pdf = np.zeros(pdf.shape)
         if shift_index > 0:
-            shifted_pdf[shift_index:] = pdf[:-shift_index]
+            if shift_index > pdf.shape[-1]:
+                shifted_pdf[-1] = 1
+            else:
+                shifted_pdf[shift_index:] = pdf[:-shift_index]
         elif shift_index < 0:
-            shifted_pdf[:shift_index] = pdf[-shift_index:]
+            if -shift_index > pdf.shape[-1]:
+                shifted_pdf[0] = 1
+            else:
+                shifted_pdf[:shift_index] = pdf[-shift_index:]
         total = np.sum(shifted_pdf)
         if total == 0:
             if shift_index > 0:

@@ -15,6 +15,7 @@ vertical_symetry = True
 horizontal_symetry = True
 # end states of the game may corresponds to terminal nodes in the state tree
 terminal_state = True
+reward_span = 0
 
 
 #simple fully connected network

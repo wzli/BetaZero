@@ -9,16 +9,17 @@ from keras.layers.merge import Add
 from .utils import ascii_board
 
 # keras model
-board_size = (5, 5)
+board_size = (13, 13)
 input_dimensions = (2, *board_size)
-output_dimension = 2
-max_value = 1
+output_dimension = board_size[0] * board_size[1]
+max_value = (board_size[0] * board_size[1] - 1) * 0.5
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
 # end state of the game may not nessesaily be terminal nodes in the state tree
 terminal_state = False
+reward_span = 6
 
 
 # keras model, based alphazero but grossly slimmed down
@@ -173,6 +174,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
         group_lookup = np.copy(group_lookup)
     group_lookup[stone] = group
     board[stone] = perspective
+    captured_group = None
     # only the adjacent spots of affected
     for adjacent_spot in get_adjacent(stone):
         # if there is an adjacent enemy
@@ -185,14 +187,15 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
             enemy_group.liberties.discard(stone)
             # if no more liberties left capture enemy
             if not enemy_group.liberties:
+                captured_group = enemy_group
                 # remove the capture spot from list
                 if session:
                     # recode ko if only one piece was taken
-                    if len(enemy_group.stones) == 1:
+                    if len(captured_group.stones) == 1:
                         session.ko = adjacent_spot
-                    session.empty_spots.update(enemy_group.stones)
+                    session.empty_spots.update(captured_group.stones)
                 # remove peices
-                for captured in enemy_group.stones:
+                for captured in captured_group.stones:
                     board[captured] = 0
                     group_lookup[captured] = None
                     # add liberties back to surrounding friendly groups
@@ -210,7 +213,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
         # add liberties if there are free space
         elif board[adjacent_spot] == 0:
             group.liberties.add(adjacent_spot)
-    return board, group_lookup
+    return board, group_lookup, captured_group
 
 
 def print_groups(group_lookup):
@@ -244,6 +247,7 @@ class Session:
         # default values if nothing happens
         board = self.board
         group_lookup = self.group_lookup
+        captured_group = None
         reward = 0
         reset = 0
         # if invalid stone, reject, reset 1, and negative reward
@@ -256,20 +260,18 @@ class Session:
             # end of game when both players pass
             if action:
                 self.turn_pass = False
-                board, group_lookup = place_stone(action, perspective, board,
+                board, group_lookup, captured_group = place_stone(action, perspective, board,
                                                   group_lookup, self)
             elif self.turn_pass:
-                reward = 1
                 reset = self.n_turns
                 self.reset()
             else:
                 self.turn_pass = True
         else:
             if action:
-                board, group_lookup = place_stone(action, perspective, board,
+                board, group_lookup, captured_group = place_stone(action, perspective, board,
                                                   group_lookup)
             elif self.turn_pass:
-                reward = 1
                 reset = self.n_turns + 1
         liberty_map = generate_liberty_map(board, group_lookup)
         territory_map = generate_territory_map(board)
@@ -277,9 +279,10 @@ class Session:
         if mutable:
             self.state = State(self, self.perspective, liberty_map,
                                territory_map)
-        if reward == 1:
-            reward = np.clip(np.sum(territory_map), -max_value,
-                             max_value) * perspective
+        if reset > 1:
+            reward = np.sum(territory_map) * perspective
+        elif reset == 0 and captured_group:
+            reward = len(captured_group.stones)
         return state, reward, reset
 
     def is_suicide(self, stone, perspective):
