@@ -7,6 +7,7 @@ parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
 parser.add_argument(
     '-s', '--self-train', action="store_true", help='self training mode')
 parser.add_argument('-m', '--model', help='path to the hdf5 model file')
+parser.add_argument('-a', '--adversary', help='path to the adversary hdf5 model file')
 parser.add_argument(
     '-i',
     '--save-interval',
@@ -38,6 +39,8 @@ if not args.model:
 np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
 agent = ai.Agent(game, args.model)
+if args.adversary:
+    adversary_agent = ai.Agent(game, args.adversary)
 session = game.Session()
 state, reward, reset = session.reset()
 
@@ -45,18 +48,37 @@ if args.self_train:
     match_count = 0
     save_count_down = args.save_interval
     save_time = timeit.default_timer()
+    adversary_turn = False
+    wins = 0
+    ties = 0
     while True:
         agent.update_session(state, reward, reset)
-        action = agent.generate_action()
+        if args.adversary:
+            adversary_agent.update_session(state, reward, reset)
+        if adversary_turn:
+            action = adversary_agent.generate_action()
+            adversary_turn = False
+        else:
+            action = agent.generate_action()
+            if args.adversary:
+                adversary_turn = True
         state, reward, reset = session.do_action(action)
         if reset == 1:
             print(state, state.perspective, action)
             raise ValueError("agent should not generate invalid moves")
         if reset > 2:
+            if reward == 0:
+                ties += 1
+            elif reward > 0 and adversary_turn:
+                wins += 1
+            elif reward < 0 and not adversary_turn:
+                wins += 1
             match_count += 1
             save_count_down -= 1
             if save_count_down == 0:
                 agent.value_model.save(args.model)
+                if args.adversary:
+                    adversary_agent.value_model.save(args.adversary)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
                     expected, variance = expected_value(y, True)
                     expected = round(2 * game.max_value * (expected - 0.5), 3)
@@ -67,6 +89,7 @@ if args.self_train:
                         plt.plot(y, label=i)
                 print("model saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
+                print("win rate", wins/match_count, "tie rate", ties/match_count)
                 save_count_down = args.save_interval
                 if args.plot:
                     plt.savefig(args.game + "_match_"+ str(match_count) +"_value_pdf.png")
