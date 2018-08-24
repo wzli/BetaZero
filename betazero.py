@@ -21,7 +21,7 @@ import timeit
 import numpy as np
 import matplotlib
 from betazero import ai
-from betazero.utils import expected_value, parse_grid_input
+from betazero.utils import expected_value, parse_grid_input, ascii_board
 
 if args.plot:
     matplotlib.use('Agg')
@@ -53,16 +53,6 @@ if args.self_train:
     ties = 0
     while True:
         agent.update_session(state, reward, reset)
-        if args.adversary:
-            adversary_agent.update_session(state, reward, reset)
-        if adversary_turn:
-            action = adversary_agent.generate_action()
-            adversary_turn = False
-        else:
-            action = agent.generate_action()
-            if args.adversary:
-                adversary_turn = True
-        state, reward, reset = session.do_action(action)
         if reset == 1:
             print(state, state.perspective, action)
             raise ValueError("agent should not generate invalid moves")
@@ -83,7 +73,7 @@ if args.self_train:
                     expected, variance = expected_value(y, True)
                     expected = round(2 * game.max_value * (expected - 0.5), 3)
                     deviation = round(2 * game.max_value * (variance**0.5), 3)
-                    print(x[0], "expected value", expected, "deviation",
+                    print(ascii_board(x[0]), "expected value", expected, "deviation",
                           deviation, "turn", i + 1)
                     if args.plot:
                         plt.plot(y, label=i)
@@ -95,6 +85,16 @@ if args.self_train:
                     plt.savefig(args.game + "_match_"+ str(match_count) +"_value_pdf.png")
                     plt.clf()
                 save_time = timeit.default_timer()
+        if args.adversary:
+            adversary_agent.update_session(state, reward, reset)
+        if adversary_turn:
+            action = adversary_agent.generate_action()
+            adversary_turn = False
+        else:
+            action = agent.generate_action()
+            if args.adversary:
+                adversary_turn = True
+        state, reward, reset = session.do_action(action)
 else:
     while True:
         agent.update_session(state, reward, reset)

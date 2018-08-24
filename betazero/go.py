@@ -64,9 +64,9 @@ def _ValueModel():
 
 
 def ValueModel():
-    n_filters = 128
+    n_filters = 64
     expansion_factor = 5
-    n_res_blocks = 15
+    n_res_blocks = 10
     batch_norm_momentum = 0.999
     l2_reg = 1e-4
 
