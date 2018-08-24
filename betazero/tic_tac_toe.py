@@ -6,7 +6,7 @@ from .utils import ascii_board
 
 # keras model
 board_size = (3, 3)
-input_dimensions = (1, *board_size)
+input_dimensions = (*board_size, 1)
 output_dimension = 3
 max_value = 1
 min_max = True

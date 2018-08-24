@@ -45,7 +45,7 @@ class Agent:
                   for action in actions)))
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(
-            np.vstack((state_transition.array()
+            np.vstack((np.swapaxes(state_transition.array(), 1, -1)
                        for state_transition in state_transitions)))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
@@ -87,7 +87,7 @@ class Agent:
         self.x_train = training_input_set
         # generate symetric input arrays
         training_input_set = np.vstack([
-            array for array in symetric_arrays(
+            np.swapaxes(array, 1, -1) for array in symetric_arrays(
                 training_input_set, self.game.rotational_symetry,
                 self.game.vertical_symetry, self.game.horizontal_symetry)
         ])
