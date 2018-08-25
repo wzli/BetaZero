@@ -61,7 +61,6 @@ def ValueModel():
     outputs = Dense(output_dimension, kernel_regularizer=regularizers.l2(l2_reg), activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
-    print(model.summary())
     return model
 
 
@@ -201,7 +200,7 @@ class Session:
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, self.perspective, np.zeros(board_size),
+        self.state = State(self, -self.perspective, np.zeros(board_size),
                            np.zeros(board_size))
         return self.state, 0, 0
 

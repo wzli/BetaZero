@@ -1,4 +1,9 @@
 import numpy as np
+from keras.models import Model
+from keras import regularizers
+from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
+from keras.layers.normalization import BatchNormalization
+from keras.layers.merge import Add
 
 # keras model
 board_size = (10, 9)
@@ -13,7 +18,51 @@ horizontal_symetry = True
 terminal_state = True
 reward_span = 6
 
-stalemate_count = 30
+max_stalemate_count = 30
+
+# keras model, based on alphazero and mobilenetv2
+def ValueModel():
+    n_filters = 32
+    expansion_factor = 5
+    n_res_blocks = 5
+    batch_norm_momentum = 0.999
+    l2_reg = 1e-4
+
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(n_filters, (3, 3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(inputs)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6)(x)
+    for i in range(n_res_blocks):
+        x_in = x
+        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6)(x)
+        x = DepthwiseConv2D((3,3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6)(x)
+        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = Add()([x, x_in])
+    for stride in (2, 2):
+        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6)(x)
+        x = DepthwiseConv2D((3,3), padding='same', strides=stride, use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6)(x)
+        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6)(x)
+    x = DepthwiseConv2D((3,3), padding='valid', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6)(x)
+    x = Flatten()(x)
+    outputs = Dense(output_dimension, kernel_regularizer=regularizers.l2(l2_reg), activation='softmax')(x)
+    model = Model(inputs, outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    return model
 
 
 def is_within_bounds(move):
@@ -43,21 +92,19 @@ class Piece:
             return False
         return True
 
-    def move(self, move):
-        reward = 0
-        if self.board[move]:
-            reward = self.board[move].reward
-            self.peices[-self.player].remove(self.board[move])
-        self.board[move] = self
-        self.board[self.location] = None
-        self.location = move
-        return self.board, reward
-
-    def test(self, move):
-        board = np.copy(self.board)
+    def move(self, move, mutable = True):
+        if mutable:
+            board = self.board
+            if board[move]:
+                self.pieces[-self.player].remove(board[move])
+        else:
+            board = np.copy(self.board)
         reward = board[move].reward if board[move] else 0
         board[move] = self
         board[self.location] = None
+        if mutable:
+            self.location = move
+            board = np.copy(board)
         return board, reward
 
 
@@ -241,7 +288,7 @@ class Session:
         for player in (1, -1):
             for piece, location in default_spawn[player]:
                 piece(self.board, self.pieces, player, location)
-        return State(self, np.copy(self.board), self.player), 0, 0
+        return State(self, np.copy(self.board), -self.player), 0, 0
 
     def get_banned_move(self):
         if len(self.move_history) < 3:
@@ -258,7 +305,7 @@ class Session:
         piece = self.board[location]
         if (not piece
                 or piece.player != self.player
-                or move not in peice.get_moves()
+                or move not in piece.get_moves()
                 or action == self.get_banned_move
                 ):
             return State(self, np.copy(self.board), self.player), -max_value, 1
@@ -269,14 +316,12 @@ class Session:
             self.stalemate_count += 1
         else:
             self.stalemate_count = 0
-        if reward >= max_value:
+        if reward >= max_value or self.stalemate_count >= max_stalemate_count:
             reset = len(self.move_history)
-        elif self.stalemate_count >= max_stalemate_count:
-            reset = len(self.move_history)
-            reward = 0
+            self.reset()
         else:
             reset = 0
-        return State(self, np.copy(self.board), self.player), reward, reset
+        return State(self, board, piece.player), reward, reset
 
 
 #------------ The below is required game interface for betazero
@@ -308,20 +353,16 @@ class State:
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     banned_move = state.session.get_banned_move()
-    return [(piece.location, move) for piece in state.session.pieces[state.player]
+    actions = [(piece.location, move) for piece in state.session.pieces[state.player]
             for move in piece.get_moves() if (piece.location, move) != banned_move]
+    return actions
 
 
 def predict_action(state, action):
     location, move = action
-    board, reward = state.board[location].test(move)
-    reset = state.session.n_turns + 1 if reward >= max_value else 0
+    board, reward = state.session.board[location].move(move, mutable=False)
+    if reward >= max_value or state.session.stalemate_count + 1 >= max_stalemate_count:
+        reset = len(state.session.move_history) + 1
+    else:
+        reset = 0
     return State(state.session, board, state.player), reward, reset
-
-#session = Session()
-#state = State(session, session.board, 1)
-#
-#for action in get_actions(state):
-#    state_transition, reward, reset = predict_action(state, action)
-#    print(state_transition, action)
-#print(state)

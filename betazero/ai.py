@@ -18,6 +18,7 @@ class Agent:
         except OSError:
             print("Failed to load", model, "-> create new model")
             self.value_model = game.ValueModel()
+        print(self.value_model.summary())
         # compute constants
         self.symetric_set_size = ((int(self.game.rotational_symetry) + 1) *
                                   (int(self.game.vertical_symetry) + 1) *
@@ -45,7 +46,7 @@ class Agent:
                   for action in actions)))
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(
-            np.vstack((np.swapaxes(state_transition.array(), 1, -1)
+            np.vstack((np.rollaxis(state_transition.array(), 1, 4)
                        for state_transition in state_transitions)))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
@@ -81,13 +82,15 @@ class Agent:
         """generate a training set by propagative rewards back in state history"""
         if steps < 1:
             raise ValueError("step number < 1")
+        elif steps > len(self.state_history) - 1:
+            steps = len(self.state_history) - 1
         # generate input set based on recent history
         training_input_set = np.vstack(
             input_state.array() for input_state in self.state_history[-steps:])
         self.x_train = training_input_set
         # generate symetric input arrays
         training_input_set = np.vstack([
-            np.swapaxes(array, 1, -1) for array in symetric_arrays(
+            np.rollaxis(array, 1, 4) for array in symetric_arrays(
                 training_input_set, self.game.rotational_symetry,
                 self.game.vertical_symetry, self.game.horizontal_symetry)
         ])

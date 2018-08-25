@@ -1,5 +1,5 @@
 #usr/bin/python3
-games = ['go', 'tic_tac_toe']
+games = ['go', 'chinese_chess', 'tic_tac_toe']
 
 import argparse
 parser = argparse.ArgumentParser(description='BetaZero App')
@@ -31,6 +31,8 @@ print("seleted game:", args.game)
 if args.game == games[0]:
     from betazero import go as game
 elif args.game == games[1]:
+    from betazero import chinese_chess as game
+elif args.game == games[2]:
     from betazero import tic_tac_toe as game
 
 if not args.model:
@@ -109,7 +111,7 @@ else:
             deviation = round(variance**0.5, 3)
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
                   value_sample, '\tE:', expected, '  D:', deviation)
-        print("agent played", [i + 1 for i in action])
+        print("agent played", action)
         if reset > 1:
             print(state.flip())
             if reward == 0:
@@ -120,8 +122,11 @@ else:
                 print("agent loses, score", reward)
         agent.update_session(state, reward, reset)
         while True:
-            print('\n', session.state)
-            move_index = parse_grid_input(game.board_size)
+            print('\n', state.flip())
+            if args.game == games[1]:
+                move_index = tuple((parse_grid_input(game.board_size), parse_grid_input(game.board_size)))
+            else:
+                move_index = parse_grid_input(game.board_size)
             state, reward, reset = session.do_action(move_index)
             if reset == 1:
                 print("INVALID ACTION")
