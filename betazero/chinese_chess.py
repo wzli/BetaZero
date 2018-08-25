@@ -13,6 +13,8 @@ horizontal_symetry = True
 terminal_state = True
 reward_span = 6
 
+stalemate_count = 30
+
 
 def is_within_bounds(move):
     return move[0] >= 0 and move[0] < board_size[0] and move[1] >= 0 and move[1] < board_size[1]
@@ -41,10 +43,8 @@ class Piece:
             return False
         return True
 
-    def move(self, move, check_invalid = True):
+    def move(self, move):
         reward = 0
-        if check_invalid and move not in self.get_moves():
-            return self.board, -max_value
         if self.board[move]:
             reward = self.board[move].reward
             self.peices[-self.player].remove(self.board[move])
@@ -53,10 +53,8 @@ class Piece:
         self.location = move
         return self.board, reward
 
-    def test(self, move, check_invalid = False):
+    def test(self, move):
         board = np.copy(self.board)
-        if check_invalid and move not in self.get_moves():
-            return board, -max_value
         reward = board[move].reward if board[move] else 0
         board[move] = self
         board[self.location] = None
@@ -235,26 +233,49 @@ class Session:
         self.reset()
 
     def reset(self):
-        self.n_turns = 0
         self.player = 1
         self.board = np.empty(board_size, dtype=object)
         self.pieces = (None, set(), set())
+        self.move_history = []
+        self.stalemate_count = 0
         for player in (1, -1):
             for piece, location in default_spawn[player]:
                 piece(self.board, self.pieces, player, location)
         return State(self, np.copy(self.board), self.player), 0, 0
 
-    def do_action(self, check_invalid = True):
-        if not self.board[location] or self.board[location].player != self.player:
+    def get_banned_move(self):
+        if len(self.move_history) < 3:
+            return None
+        opponent_location, opponent_move = self.move_history[-1]
+        if (opponent_move, opponent_location) == self.move_history[-3]:
+            move, location = self.move_history[-2]
+            return (location, move)
+
+    def do_action(self, action):
+        if any((not is_within_bounds(index) for index in action)):
+            return State(self, np.copy(self.board), self.player), -max_value, 1
+        location, move = action
+        piece = self.board[location]
+        if (not piece
+                or piece.player != self.player
+                or move not in peice.get_moves()
+                or action == self.get_banned_move
+                ):
             return State(self, np.copy(self.board), self.player), -max_value, 1
         board, reward = self.board[location].move(move)
-        if reward < 0:
-            reset = 1
+        self.move_history.append(action)
+        self.player *= -1
+        if reward == 0:
+            self.stalemate_count += 1
+        else:
+            self.stalemate_count = 0
+        if reward >= max_value:
+            reset = len(self.move_history)
+        elif self.stalemate_count >= max_stalemate_count:
+            reset = len(self.move_history)
+            reward = 0
         else:
             reset = 0
-            self.n_turns += 1
-        if reward >= max_value:
-            reset = self.n_turns
         return State(self, np.copy(self.board), self.player), reward, reset
 
 
@@ -286,8 +307,9 @@ class State:
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
+    banned_move = state.session.get_banned_move()
     return [(piece.location, move) for piece in state.session.pieces[state.player]
-            for move in piece.get_moves()]
+            for move in piece.get_moves() if (piece.location, move) != banned_move]
 
 
 def predict_action(state, action):
