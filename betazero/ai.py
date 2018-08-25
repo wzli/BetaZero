@@ -1,3 +1,4 @@
+import threading, queue
 import numpy as np
 from keras.models import load_model
 from .utils import *
@@ -7,7 +8,6 @@ STATE_TRANSITIONS = 1
 REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
-
 
 class Agent:
     def __init__(self, game, model):
@@ -27,10 +27,22 @@ class Agent:
         self.state_history = []
         self.reward_history = []
         self.action_prediction_history = []
+
         # only for debug
         self.value_samples = None
         self.x_train = None
         self.y_train = None
+
+        # train on a seperate thread
+        self.training_queue = queue.Queue()
+        training_thread = threading.Thread(target=self.training_loop)
+        training_thread.daemon = True
+        training_thread.start()
+
+    def training_loop(self):
+        while True:
+            training_set = self.training_queue.get()
+            self.value_model.fit(*training_set, verbose=0)
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:
@@ -148,9 +160,9 @@ class Agent:
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
             # if the game resets, train the network
-            x_train, y_train = self.generate_training_set(
+            training_set = self.generate_training_set(
                 reset_count, self.game.terminal_state)
-            self.value_model.fit(x_train, y_train, verbose=0)
+            self.training_queue.put(training_set)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.reward_history = self.reward_history[:-reset_count]
@@ -164,8 +176,8 @@ class Agent:
             self.action_prediction_history.append(action_predictions)
         elif reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
-            x_train, y_train = self.generate_training_set(
+            training_set = self.generate_training_set(
                 self.game.reward_span, False)
-            self.value_model.fit(x_train, y_train, verbose=0)
+            self.training_queue.put(training_set)
         elif not self.action_prediction_history[-1]:
             raise ValueError("no more actions but game doesn't reset")

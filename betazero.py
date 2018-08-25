@@ -119,6 +119,7 @@ else:
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
                   value_sample, '\tE:', expected, '  D:', deviation)
         print("agent played", action)
+        agent.update_session(state, reward, reset)
         if reset > 1:
             print('\n', state.flip())
             if reward == 0:
@@ -127,7 +128,7 @@ else:
                 print("agent wins, score", reward)
             elif reward < 0:
                 print("agent loses, score", reward)
-        agent.update_session(state, reward, reset)
+            state, _, _ = session.reset()
         while True:
             print('\n', state.flip())
             if args.game == games[1]:

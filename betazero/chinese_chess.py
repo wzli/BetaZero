@@ -20,7 +20,6 @@ reward_span = 6
 
 max_stalemate_count = 30
 
-
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
     n_filters = 128
