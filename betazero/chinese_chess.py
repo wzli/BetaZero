@@ -23,7 +23,7 @@ max_stalemate_count = 30
 
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
-    n_filters = 256
+    n_filters = 128
     expansion_factor = 5
     n_res_blocks = 20
     batch_norm_momentum = 0.999
@@ -213,6 +213,7 @@ class Elephant(Piece):
             move for move in ((row + 2, col + 2), (row + 2, col - 2),
                               (row - 2, col + 2), (row - 2, col - 2))
             if self.is_valid(move) and not self.is_across_river(move)
+            and not self.board[(move[0] + row) // 2, (move[1] + col) // 2]
         ]
 
     def __str__(self):
