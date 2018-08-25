@@ -22,9 +22,9 @@ max_stalemate_count = 30
 
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
-    n_filters = 32
+    n_filters = 256
     expansion_factor = 5
-    n_res_blocks = 5
+    n_res_blocks = 20
     batch_norm_momentum = 0.999
     l2_reg = 1e-4
 
@@ -345,9 +345,13 @@ class State:
     def key(self):
         return self.board.tobytes()
 
+
     def __str__(self):
-        return '\n'.join((' '.join((str(piece) if piece else '·'
-                                    for piece in row)) for row in self.board))
+        ascii_board = [' '.join([''] + [str(i) for i in range(board_size[1])])]
+        for i, row in enumerate(self.board):
+            ascii_board.append(' '.join([str(i)] + [str(piece) if piece else '·'
+                                    for piece in row]))
+        return '\n'.join(ascii_board)
 
 
 def get_actions(state):

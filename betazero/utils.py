@@ -87,27 +87,18 @@ def symetric_arrays(array, rotational_symetry, vertical_symetry,
     return symetric_arrays
 
 
-def ascii_board(board, perspective=1):
-    full_ascii_board = np.chararray((board.shape[0] + 1, board.shape[1] + 1))
-    full_ascii_board[0, :] = np.char.mod('%d', np.arange(board.shape[0] + 1))
-    full_ascii_board[:, 0] = np.char.mod('%d', np.arange(board.shape[1] + 1))
-    full_ascii_board[0, 0] = ''
-    ascii_board = full_ascii_board[1:, 1:]
-    board *= perspective
-    ascii_board[board == 0] = '.'
-    ascii_board[board > 0] = 'X'
-    ascii_board[board < 0] = 'O'
-    return '\n'.join((' '.join((piece for piece in row))
-                      for row in full_ascii_board.decode('utf-8')))
-
+def ascii_board(board):
+    ascii_board = [' '.join([''] + [str(i) for i in range(board.shape[1])])]
+    for i, row in enumerate(board):
+        ascii_board.append(' '.join([str(i)] + ['·' if cell == 0 else '○' if cell > 0 else '●' for cell in row]))
+    return '\n'.join(ascii_board)
 
 def parse_grid_input(board_size):
     while True:
         try:
-            move_index = tuple([
-                int(token) - 1 for token in input(
-                    'your turn, enter "row col ...": ').split(' ')
-            ])
+            move_index = tuple(
+                int(token) for token in input(
+                    'your turn, enter "row col ...": ').split(' '))
         except ValueError:
             print("INTEGER PARSING ERROR")
             continue

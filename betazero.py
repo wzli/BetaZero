@@ -21,7 +21,7 @@ import timeit
 import numpy as np
 import matplotlib
 from betazero import ai
-from betazero.utils import expected_value, parse_grid_input, ascii_board
+from betazero.utils import expected_value, parse_grid_input
 
 if args.plot:
     matplotlib.use('Agg')
@@ -56,7 +56,6 @@ if args.self_train:
     while True:
         agent.update_session(state, reward, reset)
         if reset == 1:
-            print(state, state.perspective, action)
             raise ValueError("agent should not generate invalid moves")
         if reset > 2:
             if reward == 0:
@@ -75,13 +74,14 @@ if args.self_train:
                     expected, variance = expected_value(y, True)
                     expected = round(2 * game.max_value * (expected - 0.5), 3)
                     deviation = round(2 * game.max_value * (variance**0.5), 3)
-                    print(ascii_board(x[0]), "expected value", expected, "deviation",
+                    print('\n', x, "\nexpected value", expected, "deviation",
                           deviation, "turn", i + 1)
                     if args.plot:
                         plt.plot(y, label=i)
-                print("model saved at match", match_count)
+                print("\nmodel saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
-                print("win rate", wins/match_count, "tie rate", ties/match_count)
+                if args.adversary:
+                    print("win rate", wins/match_count, "tie rate", ties/match_count)
                 save_count_down = args.save_interval
                 if args.plot:
                     plt.savefig(args.game + "_match_"+ str(match_count) +"_value_pdf.png")
@@ -100,7 +100,7 @@ if args.self_train:
 else:
     while True:
         agent.update_session(state, reward, reset)
-        action = agent.generate_action(explore=True)
+        action = agent.generate_action(explore=False)
         state, reward, reset = session.do_action(action)
 
         for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
@@ -113,7 +113,7 @@ else:
                   value_sample, '\tE:', expected, '  D:', deviation)
         print("agent played", action)
         if reset > 1:
-            print(state.flip())
+            print('\n', state.flip())
             if reward == 0:
                 print("tie")
             elif reward > 0:
