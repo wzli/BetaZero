@@ -20,6 +20,7 @@ reward_span = 6
 
 max_stalemate_count = 30
 
+
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
     n_filters = 256
@@ -29,37 +30,77 @@ def ValueModel():
     l2_reg = 1e-4
 
     inputs = Input(shape=input_dimensions)
-    x = Conv2D(n_filters, (3, 3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(inputs)
+    x = Conv2D(
+        n_filters, (3, 3),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(inputs)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
     for i in range(n_res_blocks):
         x_in = x
-        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters * expansion_factor, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = DepthwiseConv2D((3,3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = DepthwiseConv2D(
+            (3, 3),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = Add()([x, x_in])
     for stride in (2, 2):
-        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters * expansion_factor, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = DepthwiseConv2D((3,3), padding='same', strides=stride, use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = DepthwiseConv2D(
+            (3, 3),
+            padding='same',
+            strides=stride,
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
-    x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = Conv2D(
+        n_filters * expansion_factor, (1, 1),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
-    x = DepthwiseConv2D((3,3), padding='valid', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = DepthwiseConv2D(
+        (3, 3),
+        padding='valid',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
     x = Flatten()(x)
-    outputs = Dense(output_dimension, kernel_regularizer=regularizers.l2(l2_reg), activation='softmax')(x)
+    outputs = Dense(
+        output_dimension,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
@@ -67,6 +108,7 @@ def ValueModel():
 
 def is_within_bounds(move):
     return move[0] >= 0 and move[0] < board_size[0] and move[1] >= 0 and move[1] < board_size[1]
+
 
 class Piece:
     def __init__(self, board, pieces, player, spawn_location):
@@ -92,7 +134,7 @@ class Piece:
             return False
         return True
 
-    def move(self, move, mutable = True):
+    def move(self, move, mutable=True):
         if mutable:
             board = self.board
             if board[move]:
@@ -145,15 +187,15 @@ class King(Piece):
     def get_moves(self):
         row, col = self.location
         moves = [
-            move for move in ((row, col + 1), (row, col - 1),
-                              (row + 1, col), (row - 1, col))
+            move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
+                              (row - 1, col))
             if self.is_valid(move) and self.is_in_palace(move)
         ]
         col += self.player
-        while is_within_bounds((row,col)):
-            if self.board[row,col]:
+        while is_within_bounds((row, col)):
+            if self.board[row, col]:
                 if isinstance(self.board[(row, col)], King):
-                    moves.append((row,col))
+                    moves.append((row, col))
                 break
             col += self.player
         return moves
@@ -183,12 +225,16 @@ class Knight(Piece):
     def get_moves(self):
         row, col = self.location
         moves = []
-        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
-            if is_within_bounds((row + d_row, col + d_col)) and not self.board[row + d_row, col + d_col]:
-                moves.extend([move for move in (
-                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
-                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
-                    ) if self.is_valid(move)])
+        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            if is_within_bounds(
+                (row + d_row,
+                 col + d_col)) and not self.board[row + d_row, col + d_col]:
+                moves.extend([
+                    move for move in (
+                        (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
+                        (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
+                    ) if self.is_valid(move)
+                ])
         return moves
 
     def __str__(self):
@@ -201,7 +247,7 @@ class Rook(Piece):
     def get_moves(self):
         row, col = self.location
         moves = []
-        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
+        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
             move = (row + d_row, col + d_col)
             while self.is_valid(move):
                 moves.append(move)
@@ -220,7 +266,7 @@ class Cannon(Piece):
     def get_moves(self):
         row, col = self.location
         moves = []
-        for d_row, d_col in ((0 ,1), (0, -1), (1, 0), (-1, 0)):
+        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
             move = (row + d_row, col + d_col)
             while is_within_bounds(move) and not self.board[move]:
                 moves.append(move)
@@ -303,11 +349,9 @@ class Session:
             return State(self, np.copy(self.board), self.player), -max_value, 1
         location, move = action
         piece = self.board[location]
-        if (not piece
-                or piece.player != self.player
+        if (not piece or piece.player != self.player
                 or move not in piece.get_moves()
-                or action == self.get_banned_move
-                ):
+                or action == self.get_banned_move):
             return State(self, np.copy(self.board), self.player), -max_value, 1
         board, reward = self.board[location].move(move)
         self.move_history.append(action)
@@ -326,6 +370,7 @@ class Session:
 
 #------------ The below is required game interface for betazero
 
+
 class State:
     def __init__(self, session, board, player):
         self.session = session
@@ -340,25 +385,29 @@ class State:
             tuple(
                 np.vectorize(
                     lambda x: x.player * self.player if isinstance(x, piece) else 0
-                )(self.board) for piece in (Pawn, Rook, Cannon, Knight, Elephant, Guard, King)))[np.newaxis]
+                )(self.board)
+                for piece in (Pawn, Rook, Cannon, Knight, Elephant, Guard,
+                              King)))[np.newaxis]
 
     def key(self):
         return self.board.tobytes()
 
-
     def __str__(self):
         ascii_board = [' '.join([''] + [str(i) for i in range(board_size[1])])]
         for i, row in enumerate(self.board):
-            ascii_board.append(' '.join([str(i)] + [str(piece) if piece else '·'
-                                    for piece in row]))
+            ascii_board.append(
+                ' '.join([str(i)] +
+                         [str(piece) if piece else '·' for piece in row]))
         return '\n'.join(ascii_board)
 
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     banned_move = state.session.get_banned_move()
-    actions = [(piece.location, move) for piece in state.session.pieces[state.player]
-            for move in piece.get_moves() if (piece.location, move) != banned_move]
+    actions = [(piece.location, move)
+               for piece in state.session.pieces[state.player]
+               for move in piece.get_moves()
+               if (piece.location, move) != banned_move]
     return actions
 
 

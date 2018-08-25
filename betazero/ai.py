@@ -68,9 +68,9 @@ class Agent:
             value_sample = lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), weights=value_pdf)
         value_samples = np.array([
             value_sample(value_pdf) if reset_count == 0 else value_to_index(
-                reward / self.game.max_value, value_pdf.shape[-1])
-            for value_pdf, reward, reset_count in zip(value_pdfs, rewards,
-                                                      reset_counts)
+                reward / self.game.max_value,
+                value_pdf.shape[-1]) for value_pdf, reward, reset_count in zip(
+                    value_pdfs, rewards, reset_counts)
         ])
         # take the max, if max has multiple, randomly choose one
         max_value_index = np.random.choice(

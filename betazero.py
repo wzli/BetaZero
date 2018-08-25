@@ -7,14 +7,19 @@ parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
 parser.add_argument(
     '-s', '--self-train', action="store_true", help='self training mode')
 parser.add_argument('-m', '--model', help='path to the hdf5 model file')
-parser.add_argument('-a', '--adversary', help='path to the adversary hdf5 model file')
+parser.add_argument(
+    '-a', '--adversary', help='path to the adversary hdf5 model file')
 parser.add_argument(
     '-i',
     '--save-interval',
     type=int,
     default=1000,
     help='save model every i matches')
-parser.add_argument('-p', '--plot', action="store_true", help='generate value distribution plots')
+parser.add_argument(
+    '-p',
+    '--plot',
+    action="store_true",
+    help='generate value distribution plots')
 args = parser.parse_args()
 
 import timeit
@@ -81,10 +86,12 @@ if args.self_train:
                 print("\nmodel saved at match", match_count)
                 print("time elapsed", timeit.default_timer() - save_time)
                 if args.adversary:
-                    print("win rate", wins/match_count, "tie rate", ties/match_count)
+                    print("win rate", wins / match_count, "tie rate",
+                          ties / match_count)
                 save_count_down = args.save_interval
                 if args.plot:
-                    plt.savefig(args.game + "_match_"+ str(match_count) +"_value_pdf.png")
+                    plt.savefig(args.game + "_match_" + str(match_count) +
+                                "_value_pdf.png")
                     plt.clf()
                 save_time = timeit.default_timer()
         if args.adversary:
@@ -124,7 +131,8 @@ else:
         while True:
             print('\n', state.flip())
             if args.game == games[1]:
-                move_index = tuple((parse_grid_input(game.board_size), parse_grid_input(game.board_size)))
+                move_index = tuple((parse_grid_input(game.board_size),
+                                    parse_grid_input(game.board_size)))
             else:
                 move_index = parse_grid_input(game.board_size)
             state, reward, reset = session.do_action(move_index)

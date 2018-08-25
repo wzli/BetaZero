@@ -90,8 +90,11 @@ def symetric_arrays(array, rotational_symetry, vertical_symetry,
 def ascii_board(board):
     ascii_board = [' '.join([''] + [str(i) for i in range(board.shape[1])])]
     for i, row in enumerate(board):
-        ascii_board.append(' '.join([str(i)] + ['·' if cell == 0 else '○' if cell > 0 else '●' for cell in row]))
+        ascii_board.append(' '.join(
+            [str(i)] +
+            ['·' if cell == 0 else '○' if cell > 0 else '●' for cell in row]))
     return '\n'.join(ascii_board)
+
 
 def parse_grid_input(board_size):
     while True:

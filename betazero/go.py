@@ -19,6 +19,7 @@ horizontal_symetry = True
 terminal_state = False
 reward_span = 6
 
+
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
     n_filters = 128
@@ -28,37 +29,77 @@ def ValueModel():
     l2_reg = 1e-4
 
     inputs = Input(shape=input_dimensions)
-    x = Conv2D(n_filters, (3, 3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(inputs)
+    x = Conv2D(
+        n_filters, (3, 3),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(inputs)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
     for i in range(n_res_blocks):
         x_in = x
-        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters * expansion_factor, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = DepthwiseConv2D((3,3), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = DepthwiseConv2D(
+            (3, 3),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = Add()([x, x_in])
     for stride in (2, 2):
-        x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters * expansion_factor, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = DepthwiseConv2D((3,3), padding='same', strides=stride, use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = DepthwiseConv2D(
+            (3, 3),
+            padding='same',
+            strides=stride,
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
-        x = Conv2D(n_filters, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+        x = Conv2D(
+            n_filters, (1, 1),
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
-    x = Conv2D(n_filters * expansion_factor, (1, 1), padding='same', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = Conv2D(
+        n_filters * expansion_factor, (1, 1),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
-    x = DepthwiseConv2D((3,3), padding='valid', use_bias=False, kernel_regularizer=regularizers.l2(l2_reg))(x)
+    x = DepthwiseConv2D(
+        (3, 3),
+        padding='valid',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
     x = Flatten()(x)
-    outputs = Dense(output_dimension, kernel_regularizer=regularizers.l2(l2_reg), activation='softmax')(x)
+    outputs = Dense(
+        output_dimension,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        activation='softmax')(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
@@ -225,8 +266,8 @@ class Session:
             # end of game when both players pass
             if action:
                 self.turn_pass = False
-                board, group_lookup, captured_group = place_stone(action, perspective, board,
-                                                  group_lookup, self)
+                board, group_lookup, captured_group = place_stone(
+                    action, perspective, board, group_lookup, self)
             elif self.turn_pass:
                 reset = self.n_turns
                 self.reset()
@@ -234,8 +275,8 @@ class Session:
                 self.turn_pass = True
         else:
             if action:
-                board, group_lookup, captured_group = place_stone(action, perspective, board,
-                                                  group_lookup)
+                board, group_lookup, captured_group = place_stone(
+                    action, perspective, board, group_lookup)
             elif self.turn_pass:
                 reset = self.n_turns + 1
         liberty_map = generate_liberty_map(board, group_lookup)
