@@ -59,7 +59,7 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # use model to predict the value pdf of each action in action space
-        self.training_queue.join()
+        # self.training_queue.join()
         value_pdfs = self.value_model.predict(
             np.vstack((np.rollaxis(state_transition.array(), 1, 4)
                        for state_transition in state_transitions)))
