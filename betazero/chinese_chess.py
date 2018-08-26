@@ -17,8 +17,8 @@ horizontal_symetry = True
 # end states of the game may corresponds to terminal nodes in the state tree
 terminal_state = True
 reward_span = 6
-
 max_stalemate_count = 30
+
 
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
@@ -150,6 +150,7 @@ class Piece:
 
 
 class Pawn(Piece):
+    channel = 0
     reward = 1
 
     def get_moves(self):
@@ -165,83 +166,8 @@ class Pawn(Piece):
         return 'P' if self.player > 0 else 'p'
 
 
-class Guard(Piece):
-    reward = 1
-
-    def get_moves(self):
-        row, col = self.location
-        return [
-            move for move in ((row + 1, col + 1), (row + 1, col - 1),
-                              (row - 1, col + 1), (row - 1, col - 1))
-            if self.is_valid(move) and self.is_in_palace(move)
-        ]
-
-    def __str__(self):
-        return 'G' if self.player > 0 else 'g'
-
-
-class King(Piece):
-    reward = 25
-
-    def get_moves(self):
-        row, col = self.location
-        moves = [
-            move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
-                              (row - 1, col))
-            if self.is_valid(move) and self.is_in_palace(move)
-        ]
-        col += self.player
-        while is_within_bounds((row, col)):
-            if self.board[row, col]:
-                if isinstance(self.board[(row, col)], King):
-                    moves.append((row, col))
-                break
-            col += self.player
-        return moves
-
-    def __str__(self):
-        return 'K' if self.player > 0 else 'k'
-
-
-class Elephant(Piece):
-    reward = 1
-
-    def get_moves(self):
-        row, col = self.location
-        return [
-            move for move in ((row + 2, col + 2), (row + 2, col - 2),
-                              (row - 2, col + 2), (row - 2, col - 2))
-            if self.is_valid(move) and not self.is_across_river(move)
-            and not self.board[(move[0] + row) // 2, (move[1] + col) // 2]
-        ]
-
-    def __str__(self):
-        return 'E' if self.player > 0 else 'e'
-
-
-class Knight(Piece):
-    reward = 2
-
-    def get_moves(self):
-        row, col = self.location
-        moves = []
-        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            if is_within_bounds(
-                (row + d_row,
-                 col + d_col)) and not self.board[row + d_row, col + d_col]:
-                moves.extend([
-                    move for move in (
-                        (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
-                        (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
-                    ) if self.is_valid(move)
-                ])
-        return moves
-
-    def __str__(self):
-        return 'N' if self.player > 0 else 'n'
-
-
 class Rook(Piece):
+    channel = 1
     reward = 4
 
     def get_moves(self):
@@ -261,6 +187,7 @@ class Rook(Piece):
 
 
 class Cannon(Piece):
+    channel = 2
     reward = 2
 
     def get_moves(self):
@@ -282,6 +209,86 @@ class Cannon(Piece):
 
     def __str__(self):
         return 'C' if self.player > 0 else 'c'
+
+
+class Knight(Piece):
+    channel = 3
+    reward = 2
+
+    def get_moves(self):
+        row, col = self.location
+        moves = []
+        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+            if is_within_bounds(
+                (row + d_row,
+                 col + d_col)) and not self.board[row + d_row, col + d_col]:
+                moves.extend([
+                    move for move in (
+                        (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
+                        (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
+                    ) if self.is_valid(move)
+                ])
+        return moves
+
+    def __str__(self):
+        return 'N' if self.player > 0 else 'n'
+
+
+class Elephant(Piece):
+    channel = 4
+    reward = 1
+
+    def get_moves(self):
+        row, col = self.location
+        return [
+            move for move in ((row + 2, col + 2), (row + 2, col - 2),
+                              (row - 2, col + 2), (row - 2, col - 2))
+            if self.is_valid(move) and not self.is_across_river(move)
+            and not self.board[(move[0] + row) // 2, (move[1] + col) // 2]
+        ]
+
+    def __str__(self):
+        return 'E' if self.player > 0 else 'e'
+
+
+class Guard(Piece):
+    channel = 5
+    reward = 1
+
+    def get_moves(self):
+        row, col = self.location
+        return [
+            move for move in ((row + 1, col + 1), (row + 1, col - 1),
+                              (row - 1, col + 1), (row - 1, col - 1))
+            if self.is_valid(move) and self.is_in_palace(move)
+        ]
+
+    def __str__(self):
+        return 'G' if self.player > 0 else 'g'
+
+
+class King(Piece):
+    channel = 6
+    reward = 25
+
+    def get_moves(self):
+        row, col = self.location
+        moves = [
+            move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
+                              (row - 1, col))
+            if self.is_valid(move) and self.is_in_palace(move)
+        ]
+        col += self.player
+        while is_within_bounds((row, col)):
+            if self.board[row, col]:
+                if isinstance(self.board[(row, col)], King):
+                    moves.append((row, col))
+                break
+            col += self.player
+        return moves
+
+    def __str__(self):
+        return 'K' if self.player > 0 else 'k'
 
 
 default_spawn = (None, (
@@ -381,13 +388,12 @@ class State:
         return State(self.session, self.board, -self.player)
 
     def array(self):
-        return np.array(
-            tuple(
-                np.vectorize(
-                    lambda x: x.player * self.player if isinstance(x, piece) else 0
-                )(self.board)
-                for piece in (Pawn, Rook, Cannon, Knight, Elephant, Guard,
-                              King)))[np.newaxis]
+        board_array = np.zeros((7, *board_size), dtype=np.int8)
+        for (row, col), piece in np.ndenumerate(self.board):
+            if piece:
+                board_array[piece.channel, row,
+                            col] = piece.player * self.player
+        return board_array[np.newaxis]
 
     def key(self):
         return self.board.tobytes()

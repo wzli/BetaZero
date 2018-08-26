@@ -9,6 +9,7 @@ REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
 
+
 class Agent:
     def __init__(self, game, model):
         self.game = game
@@ -162,8 +163,8 @@ class Agent:
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
             # if the game resets, train the network
-            training_set = self.generate_training_set(
-                reset_count, self.game.terminal_state)
+            training_set = self.generate_training_set(reset_count,
+                                                      self.game.terminal_state)
             self.training_queue.put(training_set)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
@@ -178,8 +179,8 @@ class Agent:
             self.action_prediction_history.append(action_predictions)
         elif reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
-            training_set = self.generate_training_set(
-                self.game.reward_span, False)
+            training_set = self.generate_training_set(self.game.reward_span,
+                                                      False)
             self.training_queue.put(training_set)
         elif not self.action_prediction_history[-1]:
             raise ValueError("no more actions but game doesn't reset")
