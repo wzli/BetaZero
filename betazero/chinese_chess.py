@@ -7,7 +7,7 @@ from keras.layers.merge import Add
 
 # keras model
 board_size = (10, 9)
-input_dimensions = (*board_size, 7)
+input_dimensions = (*board_size, 8)
 output_dimension = 51
 max_value = 25
 min_max = True
@@ -104,228 +104,203 @@ def ValueModel():
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
 
+EMPTY = 0
+PAWN = 1
+ROOK = 2
+CANNON = 3
+KNIGHT = 4
+ELEPHANT = 5
+GUARD = 6
+KING = 7
 
-def is_within_bounds(move):
-    return move[0] >= 0 and move[0] < board_size[0] and move[1] >= 0 and move[1] < board_size[1]
+def enemy(piece):
+    if piece > 0:
+        piece -= 8
+    elif piece < 0:
+        piece += 8
+    return piece
 
+def get_player(piece):
+    return np.sign(piece)
 
-class Piece:
-    def __init__(self, board, pieces, player, spawn_location):
-        self.board = board
-        self.pieces = pieces
-        self.player = player
-        self.location = spawn_location
-        board[spawn_location] = self
-        pieces[player].add(self)
+def is_within_bounds(location):
+    return location[0] >= 0 and location[0] < board_size[0] and location[1] >= 0 and location[1] < board_size[1]
 
-    def is_across_river(self, move=None):
-        row = move[0] if move else self.location[0]
-        return ((row - 4.5) * self.player) > 0
+def is_across_river(player, location):
+    return ((location[0] - (board_size[0] - 1) * 0.5) * player) > 0
 
-    def is_in_palace(self, move=None):
-        row, col = move if move else self.location
-        return ((row - 4.5) * self.player) < -2 and col > 2 and col < 6
+def is_in_palace(player, location):
+    row, col = location
+    return ((row - (board_size[0] - 1) * 0.5) * player) < -2 and col > 2 and col < 6
 
-    def is_valid(self, move):
-        if not is_within_bounds(move):
-            return False
-        if self.board[move] and self.board[move].player == self.player:
-            return False
-        return True
+def is_valid_move(board, player, move):
+    if not is_within_bounds(move):
+        return False
+    if get_player(board[move]) == player:
+        return False
+    return True
 
-    def move(self, move, mutable=True):
-        if mutable:
-            board = self.board
-            if board[move]:
-                self.pieces[-self.player].remove(board[move])
-        else:
-            board = np.copy(self.board)
-        reward = board[move].reward if board[move] else 0
-        board[move] = self
-        board[self.location] = None
-        if mutable:
-            self.location = move
-            board = np.copy(board)
-        return board, reward
+def get_banned_move(move_history):
+    if len(move_history) < 3:
+        return None
+    opponent_location, opponent_move = move_history[-1]
+    if (opponent_move, opponent_location) == move_history[-3]:
+        move, location = move_history[-2]
+        return (location, move)
 
+def move_piece(board, location, move):
+    board = np.copy(board)
+    reward = Rewards[board[move]]
+    board[move] = board[location]
+    board[location] = EMPTY
+    return board, reward
 
-class Pawn(Piece):
-    channel = 0
-    reward = 1
+def PawnMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    moves = [(row + player, col)]
+    if is_across_river(player, location):
+        moves.append((row, col + 1))
+        moves.append((row, col - 1))
+    moves = [move for move in moves if is_valid_move(board, player, move)]
+    return moves
 
-    def get_moves(self):
-        row, col = self.location
-        moves = [(row + self.player, col)]
-        if self.is_across_river():
-            moves.append((row, col + 1))
-            moves.append((row, col - 1))
-        moves = [move for move in moves if self.is_valid(move)]
-        return moves
-
-    def __str__(self):
-        return 'P' if self.player > 0 else 'p'
-
-
-class Rook(Piece):
-    channel = 1
-    reward = 4
-
-    def get_moves(self):
-        row, col = self.location
-        moves = []
-        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            move = (row + d_row, col + d_col)
-            while self.is_valid(move):
-                moves.append(move)
-                if self.board[move]:
-                    break
-                move = (move[0] + d_row, move[1] + d_col)
-        return moves
-
-    def __str__(self):
-        return 'R' if self.player > 0 else 'r'
-
-
-class Cannon(Piece):
-    channel = 2
-    reward = 2
-
-    def get_moves(self):
-        row, col = self.location
-        moves = []
-        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            move = (row + d_row, col + d_col)
-            while is_within_bounds(move) and not self.board[move]:
-                moves.append(move)
-                move = (move[0] + d_row, move[1] + d_col)
-            move = (move[0] + d_row, move[1] + d_col)
-            while is_within_bounds(move):
-                if self.board[move]:
-                    if self.board[move].player == -self.player:
-                        moves.append(move)
-                    break
-                move = (move[0] + d_row, move[1] + d_col)
-        return moves
-
-    def __str__(self):
-        return 'C' if self.player > 0 else 'c'
-
-
-class Knight(Piece):
-    channel = 3
-    reward = 2
-
-    def get_moves(self):
-        row, col = self.location
-        moves = []
-        for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-            if is_within_bounds(
-                (row + d_row,
-                 col + d_col)) and not self.board[row + d_row, col + d_col]:
-                moves.extend([
-                    move for move in (
-                        (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
-                        (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
-                    ) if self.is_valid(move)
-                ])
-        return moves
-
-    def __str__(self):
-        return 'N' if self.player > 0 else 'n'
-
-
-class Elephant(Piece):
-    channel = 4
-    reward = 1
-
-    def get_moves(self):
-        row, col = self.location
-        return [
-            move for move in ((row + 2, col + 2), (row + 2, col - 2),
-                              (row - 2, col + 2), (row - 2, col - 2))
-            if self.is_valid(move) and not self.is_across_river(move)
-            and not self.board[(move[0] + row) // 2, (move[1] + col) // 2]
-        ]
-
-    def __str__(self):
-        return 'E' if self.player > 0 else 'e'
-
-
-class Guard(Piece):
-    channel = 5
-    reward = 1
-
-    def get_moves(self):
-        row, col = self.location
-        return [
-            move for move in ((row + 1, col + 1), (row + 1, col - 1),
-                              (row - 1, col + 1), (row - 1, col - 1))
-            if self.is_valid(move) and self.is_in_palace(move)
-        ]
-
-    def __str__(self):
-        return 'G' if self.player > 0 else 'g'
-
-
-class King(Piece):
-    channel = 6
-    reward = 25
-
-    def get_moves(self):
-        row, col = self.location
-        moves = [
-            move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
-                              (row - 1, col))
-            if self.is_valid(move) and self.is_in_palace(move)
-        ]
-        col += self.player
-        while is_within_bounds((row, col)):
-            if self.board[row, col]:
-                if isinstance(self.board[(row, col)], King):
-                    moves.append((row, col))
+def RookMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    moves = []
+    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+        move = (row + d_row, col + d_col)
+        while is_valid_move(board, player, move):
+            moves.append(move)
+            if board[move] != EMPTY:
                 break
-            col += self.player
-        return moves
+            move = (move[0] + d_row, move[1] + d_col)
+    return moves
 
-    def __str__(self):
-        return 'K' if self.player > 0 else 'k'
+def CannonMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    moves = []
+    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+        move = (row + d_row, col + d_col)
+        while is_within_bounds(move) and board[move] == EMPTY:
+            moves.append(move)
+            move = (move[0] + d_row, move[1] + d_col)
+        move = (move[0] + d_row, move[1] + d_col)
+        while is_within_bounds(move):
+            if board[move] != EMPTY:
+                if get_player(board[move]) == -player:
+                    moves.append(move)
+                break
+            move = (move[0] + d_row, move[1] + d_col)
+    return moves
 
+def KnightMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    moves = []
+    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+        if (is_within_bounds((row + d_row, col + d_col))
+                and board[row + d_row, col + d_col] == EMPTY):
+            moves.extend([
+                move for move in (
+                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
+                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
+                ) if is_valid_move(board, player, move)
+            ])
+    return moves
 
-default_spawn = (None, (
-    (Pawn, (3, 0)),
-    (Pawn, (3, 2)),
-    (Pawn, (3, 4)),
-    (Pawn, (3, 6)),
-    (Pawn, (3, 8)),
-    (Rook, (0, 0)),
-    (Rook, (0, 8)),
-    (Cannon, (2, 1)),
-    (Cannon, (2, 7)),
-    (Knight, (0, 1)),
-    (Knight, (0, 7)),
-    (Elephant, (0, 2)),
-    (Elephant, (0, 6)),
-    (Guard, (0, 3)),
-    (Guard, (0, 5)),
-    (King, (0, 4)),
-), (
-    (Pawn, (6, 0)),
-    (Pawn, (6, 2)),
-    (Pawn, (6, 4)),
-    (Pawn, (6, 6)),
-    (Pawn, (6, 8)),
-    (Rook, (9, 0)),
-    (Rook, (9, 8)),
-    (Cannon, (7, 1)),
-    (Cannon, (7, 7)),
-    (Knight, (9, 1)),
-    (Knight, (9, 7)),
-    (Elephant, (9, 2)),
-    (Elephant, (9, 6)),
-    (Guard, (9, 3)),
-    (Guard, (9, 5)),
-    (King, (9, 4)),
-))
+def ElephantMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    return [
+        move for move in ((row + 2, col + 2), (row + 2, col - 2),
+                          (row - 2, col + 2), (row - 2, col - 2))
+        if is_valid_move(board, player, move) and not is_across_river(player, move)
+        and board[(move[0] + row) // 2, (move[1] + col) // 2] == EMPTY
+    ]
+
+def GuardMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    return [
+        move for move in ((row + 1, col + 1), (row + 1, col - 1),
+                          (row - 1, col + 1), (row - 1, col - 1))
+        if is_valid_move(board, player, move) and is_in_palace(player, move)
+    ]
+
+def KingMoves(board, location):
+    row, col = location
+    player = get_player(board[location])
+    moves = [
+        move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
+                          (row - 1, col))
+        if is_valid_move(board, player, move) and is_in_palace(player, move)
+    ]
+    col += player
+    while is_within_bounds((row, col)):
+        if board[row, col] != EMPTY:
+            if enemy(board[(row, col)]) == board[location]:
+                moves.append((row, col))
+            break
+        col += player
+    return moves
+
+Moves = (None,
+    PawnMoves,
+    RookMoves,
+    CannonMoves,
+    KnightMoves,
+    ElephantMoves,
+    GuardMoves,
+    KingMoves,
+)
+
+Rewards = (0, 1, 4, 2, 2, 1, 1, 25)
+
+Symbols = ('·',
+        'P', 'R', 'C', 'N', 'E', 'G', 'K',
+        'p', 'r', 'c', 'n', 'e', 'g', 'k',
+        )
+
+red_spawn = (
+    (PAWN, (3, 0)),
+    (PAWN, (3, 2)),
+    (PAWN, (3, 4)),
+    (PAWN, (3, 6)),
+    (PAWN, (3, 8)),
+    (ROOK, (0, 0)),
+    (ROOK, (0, 8)),
+    (CANNON, (2, 1)),
+    (CANNON, (2, 7)),
+    (KNIGHT, (0, 1)),
+    (KNIGHT, (0, 7)),
+    (ELEPHANT, (0, 2)),
+    (ELEPHANT, (0, 6)),
+    (GUARD, (0, 3)),
+    (GUARD, (0, 5)),
+    (KING, (0, 4))
+)
+
+black_spawn = (
+    (PAWN, (6, 0)),
+    (PAWN, (6, 2)),
+    (PAWN, (6, 4)),
+    (PAWN, (6, 6)),
+    (PAWN, (6, 8)),
+    (ROOK, (9, 0)),
+    (ROOK, (9, 8)),
+    (CANNON, (7, 1)),
+    (CANNON, (7, 7)),
+    (KNIGHT, (9, 1)),
+    (KNIGHT, (9, 7)),
+    (ELEPHANT, (9, 2)),
+    (ELEPHANT, (9, 6)),
+    (GUARD, (9, 3)),
+    (GUARD, (9, 5)),
+    (KING, (9, 4)),
+)
 
 
 class Session:
@@ -334,33 +309,23 @@ class Session:
 
     def reset(self):
         self.player = 1
-        self.board = np.empty(board_size, dtype=object)
-        self.pieces = (None, set(), set())
+        self.board = np.zeros(board_size, dtype=np.int8)
         self.move_history = []
         self.stalemate_count = 0
-        for player in (1, -1):
-            for piece, location in default_spawn[player]:
-                piece(self.board, self.pieces, player, location)
-        return State(self, np.copy(self.board), -self.player), 0, 0
-
-    def get_banned_move(self):
-        if len(self.move_history) < 3:
-            return None
-        opponent_location, opponent_move = self.move_history[-1]
-        if (opponent_move, opponent_location) == self.move_history[-3]:
-            move, location = self.move_history[-2]
-            return (location, move)
+        for piece, location in red_spawn:
+            self.board[location] = piece
+        for piece, location in black_spawn:
+            self.board[location] = enemy(piece)
+        return State(self.board, -self.player, [], 0, 0), 0, 0
 
     def do_action(self, action):
-        if any((not is_within_bounds(index) for index in action)):
-            return State(self, np.copy(self.board), self.player), -max_value, 1
         location, move = action
-        piece = self.board[location]
-        if (not piece or piece.player != self.player
-                or move not in piece.get_moves()
-                or action == self.get_banned_move):
-            return State(self, np.copy(self.board), self.player), -max_value, 1
-        board, reward = self.board[location].move(move)
+        if (not is_within_bounds(location)
+                or get_player(self.board[location]) != self.player
+                or move not in Moves[self.board[location]](self.board, location)
+                or action == get_banned_move(self.move_history)):
+            return State(self.board, self.player, self.move_history[-3:], len(self.move_history), self.stalemate_count), -max_value, 1
+        board, reward = move_piece(self.board, location, move)
         self.move_history.append(action)
         self.player *= -1
         if reward == 0:
@@ -371,28 +336,31 @@ class Session:
             reset = len(self.move_history)
             self.reset()
         else:
+            self.board = board
             reset = 0
-        return State(self, board, piece.player), reward, reset
+        return State(board, -self.player, self.move_history[-3:], len(self.move_history), self.stalemate_count), reward, reset
 
 
 #------------ The below is required game interface for betazero
 
-
 class State:
-    def __init__(self, session, board, player):
-        self.session = session
+    def __init__(self, board, player, move_history = [], n_turns = 0, stalemate_count = 0):
         self.board = board
         self.player = player
+        self.move_history = move_history
+        self.n_turns = n_turns
+        self.stalemate_count = stalemate_count
 
     def flip(self):
-        return State(self.session, self.board, -self.player)
+        return State(self.board, -self.player, self.move_history, self.n_turns, self.stalemate_count)
 
     def array(self):
-        board_array = np.zeros((7, *board_size), dtype=np.int8)
-        for (row, col), piece in np.ndenumerate(self.board):
-            if piece:
-                board_array[piece.channel, row,
-                            col] = piece.player * self.player
+        board_array = np.zeros((input_dimensions[-1], *board_size), dtype=np.int8)
+        for location, piece in np.ndenumerate(self.board):
+            if piece != 0:
+                board_array[piece, location[0], location[1]] = get_player(piece) * self.player
+                for move in Moves[piece](self.board, location):
+                    board_array[0, move[0], move[1]] = Rewards[self.board[move]] * get_player(piece) * self.player
         return board_array[np.newaxis]
 
     def key(self):
@@ -402,26 +370,20 @@ class State:
         ascii_board = [' '.join([''] + [str(i) for i in range(board_size[1])])]
         for i, row in enumerate(self.board):
             ascii_board.append(
-                ' '.join([str(i)] +
-                         [str(piece) if piece else '·' for piece in row]))
+                ' '.join([str(i)] + [Symbols[piece] for piece in row]))
         return '\n'.join(ascii_board)
 
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    banned_move = state.session.get_banned_move()
-    actions = [(piece.location, move)
-               for piece in state.session.pieces[state.player]
-               for move in piece.get_moves()
-               if (piece.location, move) != banned_move]
-    return actions
+    banned_move = get_banned_move(state.move_history)
+    return [(location, move) for location, piece in np.ndenumerate(state.board)
+            for move in Moves[piece](state.board, location) if get_player(piece) == state.player and (location, move) != banned_move]
 
 
 def predict_action(state, action):
-    location, move = action
-    board, reward = state.session.board[location].move(move, mutable=False)
-    if reward >= max_value or state.session.stalemate_count + 1 >= max_stalemate_count:
-        reset = len(state.session.move_history) + 1
-    else:
-        reset = 0
-    return State(state.session, board, state.player), reward, reset
+    board, reward = move_piece(state.board, *action)
+    stalemate_count = state.stalemate_count + 1 if reward == 0 else 0
+    reset = state.n_turns + 1 if (reward >= max_value or stalemate_count >= max_stalemate_count) else 0
+    move_history = state.move_history[-2:].append(action)
+    return State(board, state.player, move_history, state.n_turns + 1, stalemate_count), reward, reset

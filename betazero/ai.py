@@ -19,6 +19,7 @@ class Agent:
             print("Failed to load", model, "-> create new model")
             self.value_model = game.ValueModel()
         print(self.value_model.summary())
+
         # compute constants
         self.symetric_set_size = ((int(self.game.rotational_symetry) + 1) *
                                   (int(self.game.vertical_symetry) + 1) *
