@@ -76,9 +76,10 @@ if args.self_train:
                 if args.adversary:
                     adversary_agent.value_model.save(args.adversary)
                 for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
-                    expected, variance = expected_value(y, True)
-                    expected = round(2 * game.max_value * (expected - 0.5), 3)
-                    deviation = round(2 * game.max_value * (variance**0.5), 3)
+                    expected, variance = expected_value(
+                        y, agent.value_range, True)
+                    expected = round(expected, 3)
+                    deviation = round(variance**0.5, 3)
                     print('\n', x, "\nexpected value", expected, "deviation",
                           deviation, "turn", i + 1)
                     if args.plot:
@@ -113,7 +114,8 @@ else:
         for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
                 zip(*agent.action_prediction_history[-1], agent.value_samples),
                 key=lambda x: x[-1]):
-            expected, variance = expected_value(value_pdf, True)
+            expected, variance = expected_value(value_pdf, agent.value_range,
+                                                True)
             expected = round(expected, 3)
             deviation = round(variance**0.5, 3)
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
@@ -129,8 +131,9 @@ else:
             elif reward < 0:
                 print("agent loses, score", reward)
             state, _, _ = session.reset()
+        state = state.flip()
         while True:
-            print('\n', state.flip())
+            print('\n', state)
             if args.game == games[1]:
                 move_index = tuple((parse_grid_input(game.board_size),
                                     parse_grid_input(game.board_size)))

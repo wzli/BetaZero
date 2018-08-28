@@ -21,9 +21,13 @@ class Agent:
         print(self.value_model.summary())
 
         # compute constants
-        self.symetric_set_size = ((int(self.game.rotational_symetry) + 1) *
-                                  (int(self.game.vertical_symetry) + 1) *
-                                  (int(self.game.horizontal_symetry) + 1))
+        self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
+            game.vertical_symetry) + 1) * (int(game.horizontal_symetry) + 1))
+
+        self.value_range = np.linspace(
+            -game.max_value, game.max_value,
+            self.value_model.layers[-1].output.shape[-1])
+
         # history lists
         self.state_history = []
         self.reward_history = []
@@ -65,14 +69,13 @@ class Agent:
         # Samples the predicted value distribution of each possible action
         # othersize, don't sample, just take the expected value
         if explore:
-            value_sample = lambda value_pdf: np.random.choice(value_pdf.shape[0], p=value_pdf)
+            value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
-            value_sample = lambda value_pdf: np.average(np.arange(value_pdf.shape[0]), weights=value_pdf)
+            value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
         value_samples = np.array([
-            value_sample(value_pdf) if reset_count == 0 else value_to_index(
-                reward / self.game.max_value,
-                value_pdf.shape[-1]) for value_pdf, reward, reset_count in zip(
-                    value_pdfs, rewards, reset_counts)
+            reward + value_sample(value_pdf) if reset_count == 0 else
+            reward for value_pdf, reward, reset_count in zip(
+                value_pdfs, rewards, reset_counts)
         ])
         # take the max, if max has multiple, randomly choose one
         max_value_index = np.random.choice(
@@ -96,35 +99,31 @@ class Agent:
                 training_input_set, self.game.rotational_symetry,
                 self.game.vertical_symetry, self.game.horizontal_symetry)
         ])
-        # if already at terminal state, there is no future value only rewrad
+        # if already at terminal state, there is no future advantage
         if terminal_state or not self.action_prediction_history[-1]:
             training_target_set = [
-                one_hot_pdf(self.reward_history[-1] / self.game.max_value,
+                one_hot_pdf(0,
                             int(self.value_model.layers[-1].output.shape[-1]))
             ]
         else:
             training_target_set = [
-                shift_pdf(
-                    max_pdf(self.action_prediction_history[-1][VALUE_PDFS]),
-                    self.reward_history[-1] / self.game.max_value)
+                max_pdf(self.action_prediction_history[-1][VALUE_PDFS])
             ]
         # if min_max, flip value_pdfs to other player's perspective
         if self.game.min_max:
             training_target_set[0] = np.flip(training_target_set[0], 0)
         for chosen_state, reward, action_predictions in zip(
                 reversed(self.state_history[-steps + 1:]),
-                reversed(self.reward_history[-steps:-1]),
+                reversed(self.reward_history[-steps + 1:]),
                 reversed(self.action_prediction_history[-steps:-1])):
             action_index = [
                 state_transition.key()
                 for state_transition in action_predictions[STATE_TRANSITIONS]
             ].index(chosen_state.key())
-            action_predictions[VALUE_PDFS][action_index] = training_target_set[
-                -1]
-            # shift pdf to add reward, max_pdf is the pdf equivalent of max()
-            value_update = shift_pdf(
-                max_pdf(action_predictions[VALUE_PDFS]),
-                reward / self.game.max_value)
+            action_predictions[VALUE_PDFS][action_index] = shift_pdf(
+                training_target_set[-1], reward / self.game.max_value)
+            # max_pdf is the pdf equivalent of max()
+            value_update = max_pdf(action_predictions[VALUE_PDFS])
             # if min_max, flip value_pdfs to other player's perspective
             if self.game.min_max:
                 value_update = np.flip(value_update, 0)
@@ -141,7 +140,7 @@ class Agent:
             raise ValueError("reset_count < 0")
         # save in history
         self.state_history.append(state)
-        self.reward_history.append(-reward if self.game.min_max else reward)
+        self.reward_history.append(reward)
         # generate predictions for possible actions in the new state
         # if min max, assumes input state is in opponent's perspective
         # need to change to current player's perspective as input to generate perdictions
