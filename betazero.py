@@ -107,7 +107,7 @@ if args.self_train:
         state, reward, reset = session.do_action(action)
 else:
     while True:
-        agent.update_session(state, reward, reset)
+        agent.update_session(state, reward, reset, train=False)
         action = agent.generate_action(explore=False)
         state, reward, reset = session.do_action(action)
 
@@ -121,7 +121,7 @@ else:
             print('A:', action_choice, '\tR:', action_reward, '\tS:',
                   value_sample, '\tE:', expected, '  D:', deviation)
         print("agent played", action)
-        agent.update_session(state, reward, reset)
+        agent.update_session(state, reward, reset, train=False)
         if reset > 1:
             print('\n', state.flip())
             if reward == 0:

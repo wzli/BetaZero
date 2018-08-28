@@ -30,7 +30,6 @@ class Agent:
 
         # history lists
         self.state_history = []
-        self.reward_history = []
         self.action_prediction_history = []
 
         # only for debug
@@ -112,18 +111,23 @@ class Agent:
         # if min_max, flip value_pdfs to other player's perspective
         if self.game.min_max:
             training_target_set[0] = np.flip(training_target_set[0], 0)
-        for chosen_state, reward, action_predictions in zip(
+        for chosen_state, action_predictions in zip(
                 reversed(self.state_history[-steps + 1:]),
-                reversed(self.reward_history[-steps + 1:]),
                 reversed(self.action_prediction_history[-steps:-1])):
+            # reverse search action index from resultant state
             action_index = [
                 state_transition.key()
                 for state_transition in action_predictions[STATE_TRANSITIONS]
             ].index(chosen_state.key())
-            action_predictions[VALUE_PDFS][action_index] = shift_pdf(
-                training_target_set[-1], reward / self.game.max_value)
-            # max_pdf is the pdf equivalent of max()
-            value_update = max_pdf(action_predictions[VALUE_PDFS])
+            # back propagate value from child state
+            action_predictions[VALUE_PDFS][action_index] = training_target_set[
+                -1]
+            # adjust value distribution to reward and take max
+            value_update = max_pdf([
+                shift_pdf(value_pdf, reward / self.game.max_value)
+                for value_pdf, reward in zip(action_predictions[VALUE_PDFS],
+                                             action_predictions[REWARDS])
+            ])
             # if min_max, flip value_pdfs to other player's perspective
             if self.game.min_max:
                 value_update = np.flip(value_update, 0)
@@ -135,12 +139,11 @@ class Agent:
             training_target_set * self.symetric_set_size)
         return training_input_set, training_target_set
 
-    def update_session(self, state, reward, reset_count):
+    def update_session(self, state, reward, reset_count, train=True):
         if reset_count < 0:
             raise ValueError("reset_count < 0")
         # save in history
         self.state_history.append(state)
-        self.reward_history.append(reward)
         # generate predictions for possible actions in the new state
         # if min max, assumes input state is in opponent's perspective
         # need to change to current player's perspective as input to generate perdictions
@@ -148,13 +151,13 @@ class Agent:
             state.flip() if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
-            # if the game resets, train the network
-            training_set = self.generate_training_set(reset_count,
-                                                      self.game.terminal_state)
-            self.value_model.fit(*training_set, verbose=0)
+            if train:
+                # if the game resets, train the network
+                training_set = self.generate_training_set(
+                    reset_count, self.game.terminal_state)
+                self.value_model.fit(*training_set, verbose=0)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
-            self.reward_history = self.reward_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
                                                                             -reset_count
                                                                             -
@@ -163,7 +166,7 @@ class Agent:
             action_predictions = self.generate_predictions(self.state_history[
                 -1].flip() if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
-        elif reward != 0 and self.game.reward_span > 1:
+        elif train and reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)
