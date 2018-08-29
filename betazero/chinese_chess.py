@@ -26,7 +26,7 @@ def ValueModel():
     expansion_factor = 5
     n_res_blocks = 20
     batch_norm_momentum = 0.999
-    l2_reg = 1e-4
+    l2_reg = 1e-5
 
     inputs = Input(shape=input_dimensions)
     x = Conv2D(
@@ -392,12 +392,12 @@ class State:
             (input_dimensions[-1], *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
             if piece != 0:
+                piece_player = get_player(piece)
                 board_array[piece, location[0], location[
-                    1]] = get_player(piece) * self.player
+                    1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
                     board_array[0, move[0], move[
-                        1]] = rewards_lookup[self.board[move]] * get_player(
-                            piece) * self.player
+                        1]] = rewards_lookup[self.board[move]] * piece_player * self.player
         return board_array[np.newaxis]
 
     def key(self):
