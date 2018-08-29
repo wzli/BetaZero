@@ -397,7 +397,8 @@ class State:
                     1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
                     board_array[0, move[0], move[
-                        1]] = rewards_lookup[self.board[move]] * piece_player * self.player
+                        1]] = rewards_lookup[self.
+                                             board[move]] * piece_player * self.player
         return board_array[np.newaxis]
 
     def key(self):
