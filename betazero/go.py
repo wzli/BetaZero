@@ -1,27 +1,25 @@
 import numpy as np
-from keras.models import Model
-from keras import regularizers
-from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
-from keras.layers.normalization import BatchNormalization
-from keras.layers.merge import Add
 from .utils import ascii_board
 
-# keras model
 board_size = (9, 9)
-input_dimensions = (*board_size, 2)
-output_dimension = 41
 max_value = 20
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
-# end state of the game may not nessesaily be terminal nodes in the state tree
 terminal_state = False
 reward_span = 6
 
-
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
+    from keras.models import Model
+    from keras import regularizers
+    from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.merge import Add
+
+    input_dimensions = (*board_size, 2)
+    output_dimension = 41
     n_filters = 128
     expansion_factor = 5
     n_res_blocks = 20

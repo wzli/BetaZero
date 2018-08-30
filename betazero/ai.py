@@ -1,6 +1,6 @@
+from multiprocessing import Pool
 import threading, queue
 import numpy as np
-from keras.models import load_model
 from .utils import *
 
 ACTIONS = 0
@@ -9,9 +9,17 @@ REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
 
+def get_array(state):
+    return state.array()
+
+def get_channel_last_array(state):
+    return np.rollaxis(state.array(), 1, 4)
+
+process_pool = Pool()
 
 class Agent:
     def __init__(self, game, model):
+        from keras.models import load_model
         self.game = game
         # get value model
         try:
@@ -43,7 +51,7 @@ class Agent:
         self.y_train = None
 
         # train on a seperate thread
-        self.training_queue = queue.Queue(2)
+        self.training_queue = queue.Queue(10)
         training_thread = threading.Thread(target=self.training_loop)
         training_thread.daemon = True
         training_thread.start()
@@ -66,10 +74,10 @@ class Agent:
         state_transitions, rewards, reset_counts = list(
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
+        # generate input arrays, usually this takes high CPU so parallelize
+        input_arrays = process_pool.map(get_channel_last_array, state_transitions)
         # use model to predict the value pdf of each action in action space
-        value_pdfs = self.value_model.predict(
-            np.vstack((np.rollaxis(state_transition.array(), 1, 4)
-                       for state_transition in state_transitions)))
+        value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
     def generate_action(self, explore=True, state=None):
@@ -106,8 +114,7 @@ class Agent:
         elif steps > len(self.state_history) - 1:
             steps = len(self.state_history) - 1
         # generate input set based on recent history
-        training_input_set = np.vstack(
-            input_state.array() for input_state in self.state_history[-steps:])
+        training_input_set = np.vstack(process_pool.map(get_array, self.state_history[-steps:]))
         self.x_train = self.state_history[-steps:]
         # generate symetric input arrays
         training_input_set = np.vstack([

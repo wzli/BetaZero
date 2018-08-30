@@ -1,25 +1,24 @@
 #usr/bin/python3
 import numpy as np
-from keras.models import Sequential
-from keras.layers import Conv2D, Dense, Flatten
 from .utils import ascii_board
 
-# keras model
 board_size = (3, 3)
-input_dimensions = (*board_size, 1)
-output_dimension = 3
 max_value = 1
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
-# end states of the game may corresponds to terminal nodes in the state tree
 terminal_state = True
 reward_span = 0
 
-
 #simple fully connected network
 def ValueModel():
+    from keras.models import Sequential
+    from keras.layers import Conv2D, Dense, Flatten
+
+    input_dimensions = (*board_size, 1)
+    output_dimension = 3
+
     model = Sequential()
     model.add(Flatten(input_shape=input_dimensions))
     model.add(Dense(32, activation='selu'))
