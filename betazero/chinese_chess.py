@@ -387,7 +387,7 @@ class State:
 
     def array(self):
         board_array = np.zeros(
-            (input_dimensions[-1], *board_size), dtype=np.int8)
+            (8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
             if piece != 0:
                 piece_player = get_player(piece)
