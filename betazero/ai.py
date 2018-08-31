@@ -15,8 +15,6 @@ def get_array(state):
 def get_channel_last_array(state):
     return np.rollaxis(state.array(), 1, 4)
 
-process_pool = Pool()
-
 class Agent:
     def __init__(self, game, model):
         from keras.models import load_model
@@ -56,6 +54,8 @@ class Agent:
         training_thread.daemon = True
         training_thread.start()
 
+        self.process_pool = Pool()
+
     def training_loop(self):
         while True:
             training_set = self.training_queue.get()
@@ -75,7 +75,7 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = process_pool.map(get_channel_last_array, state_transitions)
+        input_arrays = self.process_pool.map(get_channel_last_array, state_transitions)
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -114,7 +114,7 @@ class Agent:
         elif steps > len(self.state_history) - 1:
             steps = len(self.state_history) - 1
         # generate input set based on recent history
-        training_input_set = np.vstack(process_pool.map(get_array, self.state_history[-steps:]))
+        training_input_set = np.vstack(self.process_pool.map(get_array, self.state_history[-steps:]))
         self.x_train = self.state_history[-steps:]
         # generate symetric input arrays
         training_input_set = np.vstack([
