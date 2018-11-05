@@ -10,6 +10,7 @@ terminal_state = True
 reward_span = 6
 max_stalemate_count = 30
 
+
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
     from keras.models import Model
@@ -386,8 +387,7 @@ class State:
                      self.stalemate_count)
 
     def array(self):
-        board_array = np.zeros(
-            (8, *board_size), dtype=np.int8)
+        board_array = np.zeros((8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
             if piece != 0:
                 piece_player = get_player(piece)

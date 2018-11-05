@@ -1,5 +1,5 @@
 from multiprocessing import Pool
-import threading, queue
+import threading, queue, os, time
 import numpy as np
 from .utils import *
 
@@ -9,27 +9,45 @@ REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
 
+
 def get_array(state):
     return state.array()
+
 
 def get_channel_last_array(state):
     return np.rollaxis(state.array(), 1, 4)
 
+
 class Agent:
-    def __init__(self, game, model):
-        from keras.models import load_model
+    def __init__(self,
+                 game,
+                 model_path='model.h5',
+                 save_interval=0,
+                 save_dir='.'):
         self.game = game
+        self.model_path = model_path
+        self.save_interval = save_interval
+        self.save_dir = save_dir
+
         # get value model
         try:
-            self.value_model = load_model(model)
+            from keras.models import load_model
+            self.value_model = load_model(model_path)
         except OSError:
-            print("Failed to load", model, "-> create new model")
+            print("Failed to load", model_path, "-> create new model")
             self.value_model = game.ValueModel()
         print(self.value_model.summary())
+
+        # create save path if doesn't exist
+        if not os.path.exists(save_dir):
+            print("Save directory", save_dir,
+                  "doesn't exist -> create new folder")
+            os.makedirs(save_dir)
 
         # required for multi-threading
         self.value_model._make_predict_function()
         self.value_model._make_train_function()
+        self.value_model._make_test_function()
 
         # compute constants
         self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
@@ -45,8 +63,6 @@ class Agent:
 
         # only for debug
         self.value_samples = None
-        self.x_train = None
-        self.y_train = None
 
         # train on a seperate thread
         self.training_queue = queue.Queue(10)
@@ -57,10 +73,44 @@ class Agent:
         self.process_pool = Pool()
 
     def training_loop(self):
+        from keras.callbacks import TensorBoard
+        tensorboard_callback = TensorBoard(
+            log_dir=self.save_dir,
+            histogram_freq=1,
+            write_graph=True,
+            write_grads=True,
+            write_images=True)
+        save_time = time.time()
+        total_sets = 0
+        save_counter = 0
         while True:
-            training_set = self.training_queue.get()
-            self.value_model.fit(*training_set, verbose=0)
+            training_set, original_training_set = self.training_queue.get()
+            if (self.save_interval >
+                    0) and (self.save_interval == save_counter):
+                save_counter = 0
+                self.value_model.fit(
+                    *training_set,
+                    verbose=0,
+                    validation_split=0.99,
+                    callbacks=[tensorboard_callback])
+                print("\nmodel saved at set", total_sets)
+                print("time elapsed", time.time() - save_time)
+                save_time = time.time()
+                self.value_model.save(
+                    os.path.join(self.save_dir,
+                                 self.model_path + '.' + str(int(save_time))))
+                for i, (x, y) in enumerate(zip(*original_training_set)):
+                    expected, variance = expected_value(
+                        y, self.value_range, True)
+                    expected = round(expected, 3)
+                    deviation = round(variance**0.5, 3)
+                    print('\n', x, "\nexpected value", expected, "deviation",
+                          deviation, "step", i + 1)
+            else:
+                self.value_model.fit(*training_set, verbose=0)
             self.training_queue.task_done()
+            total_sets += 1
+            save_counter += 1
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:
@@ -75,7 +125,8 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = self.process_pool.map(get_channel_last_array, state_transitions)
+        input_arrays = self.process_pool.map(get_channel_last_array,
+                                             state_transitions)
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -114,8 +165,9 @@ class Agent:
         elif steps > len(self.state_history) - 1:
             steps = len(self.state_history) - 1
         # generate input set based on recent history
-        training_input_set = np.vstack(self.process_pool.map(get_array, self.state_history[-steps:]))
-        self.x_train = self.state_history[-steps:]
+        original_input_set = self.state_history[-steps:]
+        training_input_set = np.vstack(
+            self.process_pool.map(get_array, original_input_set))
         # generate symetric input arrays
         training_input_set = np.vstack([
             np.rollaxis(array, 1, 4) for array in symetric_arrays(
@@ -124,17 +176,17 @@ class Agent:
         ])
         # if already at terminal state, there is no future advantage
         if terminal_state or not self.action_prediction_history[-1]:
-            training_target_set = [
+            original_target_set = [
                 one_hot_pdf(0,
                             int(self.value_model.layers[-1].output.shape[-1]))
             ]
         else:
-            training_target_set = [
+            original_target_set = [
                 max_pdf(self.action_prediction_history[-1][VALUE_PDFS])
             ]
         # if min_max, flip value_pdfs to other player's perspective
         if self.game.min_max:
-            training_target_set[0] = np.flip(training_target_set[0], 0)
+            original_target_set[0] = np.flip(original_target_set[0], 0)
         for chosen_state, action_predictions in zip(
                 reversed(self.state_history[-steps + 1:]),
                 reversed(self.action_prediction_history[-steps:-1])):
@@ -144,7 +196,7 @@ class Agent:
                 for state_transition in action_predictions[STATE_TRANSITIONS]
             ].index(chosen_state.key())
             # back propagate value from child state
-            action_predictions[VALUE_PDFS][action_index] = training_target_set[
+            action_predictions[VALUE_PDFS][action_index] = original_target_set[
                 -1]
             # adjust value distribution to reward and take max
             value_update = max_pdf([
@@ -155,13 +207,13 @@ class Agent:
             # if min_max, flip value_pdfs to other player's perspective
             if self.game.min_max:
                 value_update = np.flip(value_update, 0)
-            training_target_set.append(value_update)
-        training_target_set = list(reversed(training_target_set))
-        self.y_train = training_target_set
+            original_target_set.append(value_update)
+        original_target_set = list(reversed(original_target_set))
         # expand target set to match input set
         training_target_set = np.vstack(
-            training_target_set * self.symetric_set_size)
-        return training_input_set, training_target_set
+            original_target_set * self.symetric_set_size)
+        return (training_input_set, training_target_set), (original_input_set,
+                                                           original_target_set)
 
     def update_session(self, state, reward, reset_count, train=True):
         if reset_count < 0:

@@ -15,24 +15,15 @@ if __name__ == '__main__':
         '--save-interval',
         type=int,
         default=1000,
-        help='save model every i matches')
+        help='save model every i sets')
     parser.add_argument(
-        '-p',
-        '--plot',
-        action="store_true",
-        help='generate value distribution plots')
+        '-d', '--save-directory', help='folder to save model and logs')
     args = parser.parse_args()
 
-    import timeit
     import numpy as np
-    import matplotlib
     from betazero import ai
     from betazero.utils import expected_value, parse_grid_input
     from multiprocessing import freeze_support
-
-    if args.plot:
-        matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
 
     print("seleted game:", args.game)
     if args.game == games[0]:
@@ -47,18 +38,19 @@ if __name__ == '__main__':
     if not args.model:
         args.model = args.game + "_model.h5"
 
+    if not args.save_directory:
+        args.save_directory = args.game + "_models"
+
     np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
 
-    agent = ai.Agent(game, args.model)
+    agent = ai.Agent(game, args.model, args.save_interval, args.save_directory)
     if args.adversary:
-        adversary_agent = ai.Agent(game, args.adversary)
+        adversary_agent = ai.Agent(game, args.adversary, args.save_interval,
+                                   args.save_directory)
     session = game.Session()
     state, reward, reset = session.reset()
 
     if args.self_train:
-        match_count = 0
-        save_count_down = args.save_interval
-        save_time = timeit.default_timer()
         adversary_turn = False
         wins = 0
         ties = 0
@@ -73,32 +65,6 @@ if __name__ == '__main__':
                     wins += 1
                 elif reward < 0 and not adversary_turn:
                     wins += 1
-                match_count += 1
-                save_count_down -= 1
-                if save_count_down == 0:
-                    agent.value_model.save(args.model)
-                    if args.adversary:
-                        adversary_agent.value_model.save(args.adversary)
-                    for i, (x, y) in enumerate(zip(agent.x_train, agent.y_train)):
-                        expected, variance = expected_value(
-                            y, agent.value_range, True)
-                        expected = round(expected, 3)
-                        deviation = round(variance**0.5, 3)
-                        print('\n', x, "\nexpected value", expected, "deviation",
-                              deviation, "turn", i + 1)
-                        if args.plot:
-                            plt.plot(y, label=i)
-                    print("\nmodel saved at match", match_count)
-                    print("time elapsed", timeit.default_timer() - save_time)
-                    if args.adversary:
-                        print("win rate", wins / match_count, "tie rate",
-                              ties / match_count)
-                    save_count_down = args.save_interval
-                    if args.plot:
-                        plt.savefig(args.game + "_match_" + str(match_count) +
-                                    "_value_pdf.png")
-                        plt.clf()
-                    save_time = timeit.default_timer()
             if args.adversary:
                 adversary_agent.update_session(state, reward, reset)
             if adversary_turn:
@@ -116,10 +82,11 @@ if __name__ == '__main__':
             state, reward, reset = session.do_action(action)
 
             for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
-                    zip(*agent.action_prediction_history[-1], agent.value_samples),
+                    zip(*agent.action_prediction_history[-1],
+                        agent.value_samples),
                     key=lambda x: x[-1]):
-                expected, variance = expected_value(value_pdf, agent.value_range,
-                                                    True)
+                expected, variance = expected_value(value_pdf,
+                                                    agent.value_range, True)
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
                 print('A:', action_choice, '\tR:', action_reward, '\tS:',

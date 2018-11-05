@@ -10,6 +10,7 @@ horizontal_symetry = True
 terminal_state = False
 reward_span = 6
 
+
 # keras model, based on alphazero and mobilenetv2
 def ValueModel():
     from keras.models import Model

@@ -11,6 +11,7 @@ horizontal_symetry = True
 terminal_state = True
 reward_span = 0
 
+
 #simple fully connected network
 def ValueModel():
     from keras.models import Sequential
