@@ -1,4 +1,5 @@
 import numpy as np
+from .utils import parse_grid_input
 
 board_size = (10, 9)
 max_value = 25
@@ -427,3 +428,7 @@ def predict_action(state, action):
     move_history = state.move_history[-2:].append(action)
     return State(board, state.player, move_history, state.n_turns + 1,
                  stalemate_count), reward, reset
+
+
+def get_human_action():
+    return tuple(parse_grid_input(board_size), parse_grid_input(board_size))

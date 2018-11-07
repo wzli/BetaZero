@@ -21,10 +21,12 @@ def get_channel_last_array(state):
 class Agent:
     def __init__(self,
                  game,
+                 name='agent',
                  model_path='model.h5',
                  save_interval=0,
                  save_dir='.'):
         self.game = game
+        self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
         self.save_dir = save_dir
@@ -61,9 +63,6 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
-        # only for debug
-        self.value_samples = None
-
         # train on a seperate thread
         self.training_queue = queue.Queue(10)
         training_thread = threading.Thread(target=self.training_loop)
@@ -93,7 +92,7 @@ class Agent:
                     verbose=0,
                     validation_split=0.99,
                     callbacks=[tensorboard_callback])
-                print("\nmodel saved at set", total_sets)
+                print(self.name, "model saved at set", total_sets)
                 print("time elapsed", time.time() - save_time)
                 save_time = time.time()
                 self.value_model.save(
@@ -105,7 +104,7 @@ class Agent:
                     expected = round(expected, 3)
                     deviation = round(variance**0.5, 3)
                     print('\n', x, "\nexpected value", expected, "deviation",
-                          deviation, "step", i + 1)
+                          deviation, "step", i + 1, "\n")
             else:
                 self.value_model.fit(*training_set, verbose=0)
             self.training_queue.task_done()
@@ -131,7 +130,7 @@ class Agent:
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, explore=True, state=None):
+    def generate_action(self, explore=True, state=None, verbose=False):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
         predictions = self.generate_predictions(
@@ -153,15 +152,27 @@ class Agent:
                 value_pdfs, rewards, reset_counts)
         ])
         # take the max, if max has multiple, randomly choose one
-        max_value_index = np.random.choice(
-            np.argwhere(value_samples == np.amax(value_samples)).flat)
-        self.value_samples = value_samples
-        return actions[max_value_index]
+        action = actions[np.random.choice(
+            np.argwhere(value_samples == np.amax(value_samples)).flat)]
+        # print some debug info
+        if verbose:
+            for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
+                    zip(*predictions, value_samples), key=lambda x: x[-1]):
+                expected, variance = expected_value(value_pdf,
+                                                    self.value_range, True)
+                expected = round(expected, 3)
+                deviation = round(variance**0.5, 3)
+                print('ACT:',
+                      action_choice, '\tRWD:', action_reward, '\t\tSMP',
+                      round(value_sample,
+                            3), '\tEXP', expected, '\tSTD:', deviation)
+            print(self.name, "played", action)
+        return action
 
     def generate_training_set(self, steps, terminal_state=True):
         """generate a training set by propagative rewards back in state history"""
         if steps < 1:
-            raise ValueError("step number < 1")
+            raise ValueError(self.name + ": step number < 1")
         elif steps > len(self.state_history) - 1:
             steps = len(self.state_history) - 1
         # generate input set based on recent history
@@ -217,7 +228,7 @@ class Agent:
 
     def update_session(self, state, reward, reset_count, train=True):
         if reset_count < 0:
-            raise ValueError("reset_count < 0")
+            raise ValueError(self.name + ": reset_count < 0")
         # save in history
         self.state_history.append(state)
         # generate predictions for possible actions in the new state
@@ -248,4 +259,5 @@ class Agent:
                                                       False)
             self.training_queue.put(training_set)
         elif not self.action_prediction_history[-1]:
-            raise ValueError("no more actions but game doesn't reset")
+            raise ValueError(self.name +
+                             ": no more actions but game doesn't reset")

@@ -1,6 +1,6 @@
 #usr/bin/python3
 import numpy as np
-from .utils import ascii_board
+from .utils import ascii_board, parse_grid_input
 
 board_size = (3, 3)
 max_value = 1
@@ -131,3 +131,7 @@ class Session:
         else:
             self.reset()
         return State(state.board), reward, reset_count
+
+
+def get_human_action():
+    return parse_grid_input(board_size)

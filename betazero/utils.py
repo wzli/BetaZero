@@ -79,8 +79,8 @@ def parse_grid_input(board_size):
     while True:
         try:
             move_index = tuple(
-                int(token) for token in input(
-                    'your turn, enter "row col ...": ').split(' '))
+                int(token)
+                for token in input('enter "row col ...": ').split(' '))
         except ValueError:
             print("INTEGER PARSING ERROR")
             continue

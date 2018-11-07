@@ -1,5 +1,5 @@
 import numpy as np
-from .utils import ascii_board
+from .utils import ascii_board, parse_grid_input
 
 board_size = (9, 9)
 max_value = 20
@@ -376,3 +376,7 @@ class State:
 
     def __str__(self):
         return str(ascii_board(self.liberty_map))
+
+
+def get_human_action():
+    return parse_grid_input(board_size)
