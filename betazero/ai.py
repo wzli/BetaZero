@@ -1,4 +1,3 @@
-from multiprocessing import Pool
 import threading, queue, os, time
 import numpy as np
 from .utils import *
@@ -69,8 +68,6 @@ class Agent:
         training_thread.daemon = True
         training_thread.start()
 
-        self.process_pool = Pool()
-
     def training_loop(self):
         from keras.callbacks import TensorBoard
         tensorboard_callback = TensorBoard(
@@ -103,7 +100,7 @@ class Agent:
                         y, self.value_range, True)
                     expected = round(expected, 3)
                     deviation = round(variance**0.5, 3)
-                    print('\n', x, "\nexpected value", expected, "deviation",
+                    print(x, "\nexpected value", expected, "deviation",
                           deviation, "step", i + 1, "\n")
             else:
                 self.value_model.fit(*training_set, verbose=0)
@@ -124,8 +121,8 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = self.process_pool.map(get_channel_last_array,
-                                             state_transitions)
+        input_arrays = (np.rollaxis(state_transition.array(), 1, 4)
+                        for state_transition in state_transitions)
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -178,7 +175,7 @@ class Agent:
         # generate input set based on recent history
         original_input_set = self.state_history[-steps:]
         training_input_set = np.vstack(
-            self.process_pool.map(get_array, original_input_set))
+            (input_state.array() for input_state in original_input_set))
         # generate symetric input arrays
         training_input_set = np.vstack([
             np.rollaxis(array, 1, 4) for array in symetric_arrays(

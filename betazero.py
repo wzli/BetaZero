@@ -1,4 +1,6 @@
 #usr/bin/python3
+import argparse
+from betazero import ai
 
 
 class Player:
@@ -8,7 +10,6 @@ class Player:
 
     def update_session(self, state, reward, reset):
         self.state = state.flip()
-        self.reward = reward
         self.reset = reset
 
     def generate_action(self, explore=True, verbose=True):
@@ -27,8 +28,8 @@ class Arena:
         self.ties = 0
         self.session = self.game.Session()
         updates = self.session.reset()
-        for player_itr in self.players:
-            player_itr.update_session(*updates)
+        for player in self.players:
+            player.update_session(*updates)
         while True:
             for player in self.players:
                 self.play_turn(player, verbose)
@@ -41,8 +42,8 @@ class Arena:
             action = player.generate_action(
                 explore=not verbose, verbose=verbose)
             state, reward, reset = self.session.do_action(action)
-        for player_itr in self.players:
-            player_itr.update_session(state, reward, reset)
+        for each_player in self.players:
+            each_player.update_session(state, reward, reset)
         if reset > 1:
             if reward == 0:
                 if verbose:
@@ -63,7 +64,6 @@ class Arena:
 
 
 if __name__ == '__main__':
-    import argparse
     games = ['go', 'chinese_chess', 'tic_tac_toe']
     parser = argparse.ArgumentParser(description='BetaZero App')
     parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
@@ -81,8 +81,6 @@ if __name__ == '__main__':
     parser.add_argument(
         '-d', '--save-directory', help='folder to save model and logs')
     args = parser.parse_args()
-    from betazero import ai
-    from multiprocessing import freeze_support
     print("seleted game:", args.game)
     if args.game == games[0]:
         from betazero import go as game
@@ -90,7 +88,6 @@ if __name__ == '__main__':
         from betazero import chinese_chess as game
     elif args.game == games[2]:
         from betazero import tic_tac_toe as game
-    freeze_support()
     if not args.model:
         args.model = args.game + "_model.h5"
     if not args.save_directory:
