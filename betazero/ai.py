@@ -1,4 +1,4 @@
-import threading, queue, os, time
+import os, time
 import numpy as np
 from .utils import *
 
@@ -7,6 +7,7 @@ STATE_TRANSITIONS = 1
 REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
+
 
 class Agent:
     def __init__(self,
@@ -20,6 +21,9 @@ class Agent:
         self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
+        self.save_time = time.time()
+        self.save_counter = 0
+        self.total_sets = 0
         self.total_rewards = 0
 
         # get value model
@@ -40,11 +44,6 @@ class Agent:
                   "doesn't exist -> create new folder")
             os.makedirs(self.model_save_dir)
 
-        # required for multi-threading
-        self.value_model._make_predict_function()
-        self.value_model._make_train_function()
-        self.value_model._make_test_function()
-
         # compute constants
         self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
             game.vertical_symetry) + 1) * (int(game.horizontal_symetry) + 1))
@@ -57,52 +56,43 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
-        # train on a seperate thread
-        self.training_queue = queue.Queue(10)
-        self.training_thread = threading.Thread(target=self.training_loop)
-        self.training_thread.daemon = True
-        self.training_thread.start()
-
-    def training_loop(self):
+        # setup tensorboard callback
         from keras.callbacks import TensorBoard
-        tensorboard_callback = TensorBoard(
-            log_dir=self.model_save_dir,
-            histogram_freq=1,
-            write_graph=True,
-            write_grads=True,
-            write_images=True)
-        save_time = time.time()
-        total_sets = 0
-        save_counter = 0
-        while True:
-            training_set, original_training_set = self.training_queue.get()
-            if (self.save_interval >
-                    0) and (self.save_interval == save_counter):
-                save_counter = 0
-                self.value_model.fit(
-                    *training_set,
-                    verbose=0,
-                    validation_split=0.99,
-                    callbacks=[tensorboard_callback])
-                print(self.name, "model saved at set", total_sets)
-                print("reward/set", self.total_rewards / total_sets)
-                print("time elapsed", time.time() - save_time)
-                save_time = time.time()
-                self.value_model.save(
-                    os.path.join(self.model_save_dir,
-                                 "model_" + str(int(save_time)) + '.h5'))
-                for i, (x, y) in enumerate(zip(*original_training_set)):
-                    expected, variance = expected_value(
-                        y, self.value_range, True)
-                    expected = round(expected, 3)
-                    deviation = round(variance**0.5, 3)
-                    print(x, "\nexpected value", expected, "deviation",
-                          deviation, "step", i + 1, "\n")
-            else:
-                self.value_model.fit(*training_set, verbose=0)
-            self.training_queue.task_done()
-            total_sets += 1
-            save_counter += 1
+        self.training_callbacks = [
+            TensorBoard(
+                log_dir=self.model_save_dir,
+                histogram_freq=1,
+                write_graph=False,
+                write_grads=False,
+                write_images=True)
+        ]
+
+    def train_set(self, training_set, original_training_set):
+        if (self.save_interval >
+                0) and (self.save_interval == self.save_counter):
+            self.save_counter = 0
+            self.value_model.fit(
+                *training_set,
+                verbose=0,
+                validation_split=0.99,
+                callbacks=self.training_callbacks)
+            print(self.name, "model saved at set", self.total_sets)
+            print("reward/set", self.total_rewards / self.total_sets)
+            print("time elapsed", time.time() - self.save_time)
+            self.save_time = time.time()
+            self.value_model.save(
+                os.path.join(self.model_save_dir,
+                             "model_" + str(int(self.save_time)) + '.h5'))
+            for i, (x, y) in enumerate(zip(*original_training_set)):
+                expected, variance = expected_value(y, self.value_range, True)
+                expected = round(expected, 3)
+                deviation = round(variance**0.5, 3)
+                print(x, "\nexpected value", expected, "deviation", deviation,
+                      "step", i + 1, "\n")
+        else:
+            self.value_model.fit(*training_set, verbose=0)
+        self.total_sets += 1
+        self.save_counter += 1
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:
@@ -117,7 +107,8 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = (state_transition.array() for state_transition in state_transitions)
+        input_arrays = (state_transition.array()
+                        for state_transition in state_transitions)
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -172,9 +163,10 @@ class Agent:
         training_input_set = np.vstack(
             (input_state.array() for input_state in original_input_set))
         # generate symetric input arrays
-        training_input_set = np.vstack(symetric_arrays(
-                training_input_set, self.game.rotational_symetry,
-                self.game.vertical_symetry, self.game.horizontal_symetry))
+        training_input_set = np.vstack(
+            symetric_arrays(training_input_set, self.game.rotational_symetry,
+                            self.game.vertical_symetry,
+                            self.game.horizontal_symetry))
 
         def get_value_update(predictions):
             value_update = max_pdf([
@@ -233,8 +225,7 @@ class Agent:
                 # if the game resets, train the network
                 training_set = self.generate_training_set(
                     reset_count, self.game.terminal_state)
-                self.training_queue.put(training_set)
-                self.training_queue.join()
+                self.train_set(*training_set)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
@@ -249,8 +240,7 @@ class Agent:
             # reward received, train the network
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)
-            self.training_queue.put(training_set)
-            self.training_queue.join()
+            self.train_set(*training_set)
         elif not self.action_prediction_history[-1]:
             raise ValueError(self.name +
                              ": no more actions but game doesn't reset")
