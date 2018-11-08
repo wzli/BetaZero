@@ -8,15 +8,6 @@ REWARDS = 2
 RESET_COUNTS = 3
 VALUE_PDFS = 4
 
-
-def get_array(state):
-    return state.array()
-
-
-def get_channel_last_array(state):
-    return np.rollaxis(state.array(), 1, 4)
-
-
 class Agent:
     def __init__(self,
                  game,
@@ -29,7 +20,6 @@ class Agent:
         self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
-        self.save_dir = save_dir
         self.total_rewards = 0
 
         # get value model
@@ -41,11 +31,14 @@ class Agent:
             self.value_model = game.ValueModel()
         print(self.value_model.summary())
 
+        self.model_save_dir = os.path.join(
+            save_dir, os.path.basename(self.model_path)) + ".save"
+
         # create save path if doesn't exist
-        if not os.path.exists(save_dir):
-            print("Save directory", save_dir,
+        if not os.path.exists(self.model_save_dir):
+            print("Save directory", self.model_save_dir,
                   "doesn't exist -> create new folder")
-            os.makedirs(save_dir)
+            os.makedirs(self.model_save_dir)
 
         # required for multi-threading
         self.value_model._make_predict_function()
@@ -72,10 +65,8 @@ class Agent:
 
     def training_loop(self):
         from keras.callbacks import TensorBoard
-        model_save_dir = os.path.join(
-            self.save_dir, os.path.basename(self.model_path)) + ".save"
         tensorboard_callback = TensorBoard(
-            log_dir=model_save_dir,
+            log_dir=self.model_save_dir,
             histogram_freq=1,
             write_graph=True,
             write_grads=True,
@@ -98,7 +89,7 @@ class Agent:
                 print("time elapsed", time.time() - save_time)
                 save_time = time.time()
                 self.value_model.save(
-                    os.path.join(model_save_dir,
+                    os.path.join(self.model_save_dir,
                                  "model_" + str(int(save_time)) + '.h5'))
                 for i, (x, y) in enumerate(zip(*original_training_set)):
                     expected, variance = expected_value(
@@ -126,8 +117,7 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = (np.rollaxis(state_transition.array(), 1, 4)
-                        for state_transition in state_transitions)
+        input_arrays = (state_transition.array() for state_transition in state_transitions)
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -182,11 +172,9 @@ class Agent:
         training_input_set = np.vstack(
             (input_state.array() for input_state in original_input_set))
         # generate symetric input arrays
-        training_input_set = np.vstack([
-            np.rollaxis(array, 1, 4) for array in symetric_arrays(
+        training_input_set = np.vstack(symetric_arrays(
                 training_input_set, self.game.rotational_symetry,
-                self.game.vertical_symetry, self.game.horizontal_symetry)
-        ])
+                self.game.vertical_symetry, self.game.horizontal_symetry))
 
         def get_value_update(predictions):
             value_update = max_pdf([

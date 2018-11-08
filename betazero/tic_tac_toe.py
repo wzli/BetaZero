@@ -17,7 +17,7 @@ def ValueModel():
     from keras.models import Sequential
     from keras.layers import Conv2D, Dense, Flatten
 
-    input_dimensions = (*board_size, 1)
+    input_dimensions = (1, *board_size)
     output_dimension = 3
 
     model = Sequential()

@@ -19,7 +19,7 @@ def ValueModel():
     from keras.layers.normalization import BatchNormalization
     from keras.layers.merge import Add
 
-    input_dimensions = (*board_size, 2)
+    input_dimensions = (2, *board_size)
     output_dimension = 41
     n_filters = 128
     expansion_factor = 5
@@ -32,6 +32,7 @@ def ValueModel():
         n_filters, (3, 3),
         padding='same',
         use_bias=False,
+        data_format='channels_first',
         kernel_regularizer=regularizers.l2(l2_reg))(inputs)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
@@ -41,6 +42,7 @@ def ValueModel():
             n_filters * expansion_factor, (1, 1),
             padding='same',
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
@@ -48,6 +50,7 @@ def ValueModel():
             (3, 3),
             padding='same',
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
@@ -55,6 +58,7 @@ def ValueModel():
             n_filters, (1, 1),
             padding='same',
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = Add()([x, x_in])
@@ -63,6 +67,7 @@ def ValueModel():
             n_filters * expansion_factor, (1, 1),
             padding='same',
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
@@ -71,6 +76,7 @@ def ValueModel():
             padding='same',
             strides=stride,
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
         x = ReLU(6)(x)
@@ -78,12 +84,14 @@ def ValueModel():
             n_filters, (1, 1),
             padding='same',
             use_bias=False,
+            data_format='channels_first',
             kernel_regularizer=regularizers.l2(l2_reg))(x)
         x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = Conv2D(
         n_filters * expansion_factor, (1, 1),
         padding='same',
         use_bias=False,
+        data_format='channels_first',
         kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
@@ -91,6 +99,7 @@ def ValueModel():
         (3, 3),
         padding='valid',
         use_bias=False,
+        data_format='channels_first',
         kernel_regularizer=regularizers.l2(l2_reg))(x)
     x = BatchNormalization(momentum=batch_norm_momentum)(x)
     x = ReLU(6)(x)
