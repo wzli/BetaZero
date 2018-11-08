@@ -115,7 +115,7 @@ class Agent:
         """from current state generate a tuple of:
         (actions, state_transitions, rewards, reset_counts, value_pdfs)
         """
-        # expect state in self perspective if min-max
+        # expect state in self perspective
         actions = self.game.get_actions(state)
         if not actions:
             return None
@@ -185,6 +185,17 @@ class Agent:
                 training_input_set, self.game.rotational_symetry,
                 self.game.vertical_symetry, self.game.horizontal_symetry)
         ])
+
+        def get_value_update(predictions):
+            value_update = max_pdf([
+                shift_pdf(value_pdf, reward / self.game.max_value)
+                for value_pdf, reward in zip(predictions[VALUE_PDFS],
+                                             predictions[REWARDS])
+            ])
+            # if min_max, flip value_pdfs to other player's perspective
+            return np.flip(value_update,
+                           0) if self.game.min_max else value_update
+
         # if already at terminal state, there is no future advantage
         if terminal_state or not self.action_prediction_history[-1]:
             original_target_set = [
@@ -193,11 +204,8 @@ class Agent:
             ]
         else:
             original_target_set = [
-                max_pdf(self.action_prediction_history[-1][VALUE_PDFS])
+                get_value_update(self.action_prediction_history[-1])
             ]
-        # if min_max, flip value_pdfs to other player's perspective
-        if self.game.min_max:
-            original_target_set[0] = np.flip(original_target_set[0], 0)
         for chosen_state, action_predictions in zip(
                 reversed(self.state_history[-steps + 1:]),
                 reversed(self.action_prediction_history[-steps:-1])):
@@ -210,15 +218,7 @@ class Agent:
             action_predictions[VALUE_PDFS][action_index] = original_target_set[
                 -1]
             # adjust value distribution to reward and take max
-            value_update = max_pdf([
-                shift_pdf(value_pdf, reward / self.game.max_value)
-                for value_pdf, reward in zip(action_predictions[VALUE_PDFS],
-                                             action_predictions[REWARDS])
-            ])
-            # if min_max, flip value_pdfs to other player's perspective
-            if self.game.min_max:
-                value_update = np.flip(value_update, 0)
-            original_target_set.append(value_update)
+            original_target_set.append(get_value_update(action_predictions))
         original_target_set = list(reversed(original_target_set))
         # expand target set to match input set
         training_target_set = np.vstack(

@@ -9,7 +9,7 @@ class Player:
         self.game = game
         self.name = name
 
-    def update_session(self, state, reward, reset):
+    def update_session(self, state, reward, reset, train=False):
         self.state = state.flip()
         self.reset = reset
 
@@ -44,7 +44,8 @@ class Arena:
                 explore=not self.has_human, verbose=self.has_human)
             state, reward, reset = self.session.do_action(action)
         for each_player in self.players:
-            each_player.update_session(state, reward, reset)
+            each_player.update_session(
+                state, reward, reset, train=not self.has_human)
         if self.has_human and reset > 1:
             if reward == 0:
                 print("tie")
