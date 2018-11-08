@@ -24,11 +24,13 @@ class Agent:
                  model_path='model.h5',
                  save_interval=0,
                  save_dir='.'):
+        self.is_human = False
         self.game = game
         self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
         self.save_dir = save_dir
+        self.total_rewards = 0
 
         # get value model
         try:
@@ -64,9 +66,9 @@ class Agent:
 
         # train on a seperate thread
         self.training_queue = queue.Queue(10)
-        training_thread = threading.Thread(target=self.training_loop)
-        training_thread.daemon = True
-        training_thread.start()
+        self.training_thread = threading.Thread(target=self.training_loop)
+        self.training_thread.daemon = True
+        self.training_thread.start()
 
     def training_loop(self):
         from keras.callbacks import TensorBoard
@@ -90,6 +92,7 @@ class Agent:
                     validation_split=0.99,
                     callbacks=[tensorboard_callback])
                 print(self.name, "model saved at set", total_sets)
+                print("reward/set", self.total_rewards / total_sets)
                 print("time elapsed", time.time() - save_time)
                 save_time = time.time()
                 self.value_model.save(
@@ -227,6 +230,7 @@ class Agent:
         if reset_count < 0:
             raise ValueError(self.name + ": reset_count < 0")
         # save in history
+        self.total_rewards += reward
         self.state_history.append(state)
         # generate predictions for possible actions in the new state
         # if min max, assumes input state is in opponent's perspective
@@ -240,6 +244,7 @@ class Agent:
                 training_set = self.generate_training_set(
                     reset_count, self.game.terminal_state)
                 self.training_queue.put(training_set)
+                self.training_queue.join()
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
@@ -255,6 +260,7 @@ class Agent:
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)
             self.training_queue.put(training_set)
+            self.training_queue.join()
         elif not self.action_prediction_history[-1]:
             raise ValueError(self.name +
                              ": no more actions but game doesn't reset")

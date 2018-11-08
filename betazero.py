@@ -5,6 +5,7 @@ from betazero import ai
 
 class Player:
     def __init__(self, game, name):
+        self.is_human = True
         self.game = game
         self.name = name
 
@@ -21,49 +22,40 @@ class Player:
 
 
 class Arena:
-    def __init__(self, game, player1, player2, verbose=False):
+    def __init__(self, game, player1, player):
         self.game = game
-        self.players = {player1, player2}
-        self.scores = {player: 0 for player in self.players}
-        self.ties = 0
         self.session = self.game.Session()
+        self.players = {player1, player2}
+        self.has_human = player1.is_human or player2.is_human
         updates = self.session.reset()
         for player in self.players:
             player.update_session(*updates)
         while True:
             for player in self.players:
-                self.play_turn(player, verbose)
+                self.play_turn(player)
 
-    def play_turn(self, player, verbose):
-        action = player.generate_action(explore=not verbose, verbose=verbose)
+    def play_turn(self, player):
+        action = player.generate_action(
+            explore=not self.has_human, verbose=self.has_human)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION")
             action = player.generate_action(
-                explore=not verbose, verbose=verbose)
+                explore=not self.has_human, verbose=self.has_human)
             state, reward, reset = self.session.do_action(action)
         for each_player in self.players:
             each_player.update_session(state, reward, reset)
-        if reset > 1:
+        if self.has_human and reset > 1:
             if reward == 0:
-                if verbose:
-                    print("tie")
-                self.ties += 1
+                print("tie")
             elif reward < 0:
-                if verbose:
-                    print(player.name, "loses")
-                self.scores[player] -= 1
-                self.ties -= 1
+                print(player.name, "loses")
             elif reward > 0:
-                if verbose:
-                    print(player.name, "wins")
-                self.scores[player] += 1
-            if verbose:
-                print("total", self.ties + sum(self.scores.values()), "wins",
-                      self.scores[player], "ties", self.ties)
+                print(player.name, "wins")
 
 
 if __name__ == '__main__':
+    # create command line arguments
     games = ['go', 'chinese_chess', 'tic_tac_toe']
     parser = argparse.ArgumentParser(description='BetaZero App')
     parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
@@ -80,7 +72,13 @@ if __name__ == '__main__':
         help='save model every i sets')
     parser.add_argument(
         '-d', '--save-directory', help='folder to save model and logs')
+    # parse and process command line arguments
     args = parser.parse_args()
+    if not args.model:
+        args.model = args.game + "_model.h5"
+    if not args.save_directory:
+        args.save_directory = args.game + "_models"
+    # load the module corresponding to selected game
     print("seleted game:", args.game)
     if args.game == games[0]:
         from betazero import go as game
@@ -88,10 +86,7 @@ if __name__ == '__main__':
         from betazero import chinese_chess as game
     elif args.game == games[2]:
         from betazero import tic_tac_toe as game
-    if not args.model:
-        args.model = args.game + "_model.h5"
-    if not args.save_directory:
-        args.save_directory = args.game + "_models"
+    # logic to decide who is playing
     if args.self_train:
         player1 = ai.Agent(game, "Agent", args.model, args.save_interval,
                            args.save_directory)
@@ -107,4 +102,5 @@ if __name__ == '__main__':
         else:
             player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
                                args.save_directory)
-    Arena(game, player1, player2, verbose=not args.self_train)
+    # start the game
+    Arena(game, player1, player2)
