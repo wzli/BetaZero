@@ -72,8 +72,10 @@ class Agent:
 
     def training_loop(self):
         from keras.callbacks import TensorBoard
+        model_save_dir = os.path.join(
+            self.save_dir, os.path.basename(self.model_path)) + ".save"
         tensorboard_callback = TensorBoard(
-            log_dir=self.save_dir,
+            log_dir=model_save_dir,
             histogram_freq=1,
             write_graph=True,
             write_grads=True,
@@ -96,8 +98,8 @@ class Agent:
                 print("time elapsed", time.time() - save_time)
                 save_time = time.time()
                 self.value_model.save(
-                    os.path.join(self.save_dir,
-                                 self.model_path + '.' + str(int(save_time))))
+                    os.path.join(model_save_dir,
+                                 "model_" + str(int(save_time)) + '.h5'))
                 for i, (x, y) in enumerate(zip(*original_training_set)):
                     expected, variance = expected_value(
                         y, self.value_range, True)

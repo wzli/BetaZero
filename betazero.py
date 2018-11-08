@@ -72,13 +72,14 @@ if __name__ == '__main__':
         default=1000,
         help='save model every i sets')
     parser.add_argument(
-        '-d', '--save-directory', help='folder to save model and logs')
+        '-d',
+        '--save-directory',
+        default='.',
+        help='folder to save model and logs')
     # parse and process command line arguments
     args = parser.parse_args()
     if not args.model:
         args.model = args.game + "_model.h5"
-    if not args.save_directory:
-        args.save_directory = args.game + "_models"
     # load the module corresponding to selected game
     print("seleted game:", args.game)
     if args.game == games[0]:
