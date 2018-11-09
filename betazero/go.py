@@ -13,48 +13,57 @@ reward_span = 4
 
 def ValueModel():
     from keras.models import Model
-    from keras.layers import Conv2D, Dense, Flatten, Input
+    from keras import regularizers
+    from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
     from keras.layers.normalization import BatchNormalization
-    from keras.layers.advanced_activations import LeakyReLU
     from keras.layers.merge import Add
+
     input_dimensions = (2, *board_size)
     output_dimension = 13
     filter_size = (3, 3)
     n_filters = 128
     n_res_blocks = 10
+    batch_norm_momentum = 0.999
+    l2_reg = 1e-4
+
     inputs = Input(shape=input_dimensions)
     x = Conv2D(
-        n_filters, filter_size, padding='same',
+        n_filters,
+        filter_size,
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
         data_format="channels_first")(inputs)
-    x = BatchNormalization()(x)
-    x = LeakyReLU()(x)
     # residual blocks
     for i in range(n_res_blocks):
         x_in = x
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6.)(x)
         x = Conv2D(
             n_filters,
             filter_size,
             padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg),
             data_format="channels_first")(x)
-        x = BatchNormalization()(x)
-        x = LeakyReLU()(x)
-        x = Conv2D(
-            n_filters,
-            filter_size,
-            padding='same',
-            data_format="channels_first")(x)
-        x = BatchNormalization()(x)
         x = Add()([x, x_in])
-        x = LeakyReLU()(x)
-    x = Conv2D(1, (1, 1), padding='same', data_format="channels_first")(x)
-    x = BatchNormalization()(x)
-    x = LeakyReLU()(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = Conv2D(
+        1, (1, 1),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        data_format="channels_first")(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
     x = Flatten()(x)
-    x = Dense(n_filters, activation='selu')(x)
-    outputs = Dense(output_dimension, activation='softmax')(x)
+    outputs = Dense(
+        output_dimension,
+        activation='softmax',
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
-    print(model.summary())
     return model
 
 
