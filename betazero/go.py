@@ -1,8 +1,8 @@
 import numpy as np
 from .utils import ascii_board, parse_grid_input
 
-board_size = (5, 5)
-max_value = 6
+board_size = (6, 6)
+max_value = board_size[0] * board_size[1] // 4
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
@@ -12,7 +12,7 @@ reward_span = 4
 
 
 # keras model, based on alphazero and mobilenetv2
-def ValueModel():
+def ValueModelMNV2():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
@@ -20,7 +20,7 @@ def ValueModel():
     from keras.layers.merge import Add
 
     input_dimensions = (2, *board_size)
-    output_dimension = 13
+    output_dimension = 2 * max_value + 1
     n_filters = 128
     expansion_factor = 5
     n_res_blocks = 10
@@ -81,7 +81,7 @@ def ValueModel():
     return model
 
 
-def ValueModel_myRes():
+def ValueModel():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
@@ -89,7 +89,7 @@ def ValueModel_myRes():
     from keras.layers.merge import Add
 
     input_dimensions = (2, *board_size)
-    output_dimension = 13
+    output_dimension = 2 * max_value + 1
     filter_size = (3, 3)
     n_filters = 128
     n_res_blocks = 10
