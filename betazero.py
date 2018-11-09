@@ -5,7 +5,6 @@ from betazero import ai
 
 class Player:
     def __init__(self, game, name):
-        self.is_human = True
         self.game = game
         self.name = name
 
@@ -22,37 +21,49 @@ class Player:
 
 
 class Arena:
-    def __init__(self, game, player1, player):
+    def __init__(self, game, player1, player2, print_actions=True):
         self.game = game
         self.session = self.game.Session()
-        self.players = {player1, player2}
-        self.has_human = player1.is_human or player2.is_human
+        self.players = (
+            None,
+            player1,
+            player2,
+        )
+        self.stats = [0, 0, 0]
+        self.self_train = player1 == player2
         updates = self.session.reset()
-        for player in self.players:
-            player.update_session(*updates)
+        for player_index in (1, -1):
+            self.players[player_index].update_session(*updates)
         while True:
-            for player in self.players:
-                self.play_turn(player)
+            for player_index in (1, -1):
+                self.play_turn(player_index, print_actions)
 
-    def play_turn(self, player):
+    def play_turn(self, player_index, print_actions):
+        player = self.players[player_index]
         action = player.generate_action(
-            explore=not self.has_human, verbose=self.has_human)
+            explore=self.self_train, verbose=print_actions)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION")
             action = player.generate_action(
-                explore=not self.has_human, verbose=self.has_human)
+                explore=self.self_train, verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
-        for each_player in self.players:
-            each_player.update_session(
-                state, reward, reset, train=not self.has_human)
-        if self.has_human and reset > 1:
+        for i in (1, -1):
+            self.players[i].update_session(
+                state, reward, reset, train=self.self_train)
+        if not self.self_train and reset > 1:
             if reward == 0:
                 print("tie")
+                self.stats[0] += 1
             elif reward < 0:
                 print(player.name, "loses")
+                self.stats[-player_index] += 1
             elif reward > 0:
                 print(player.name, "wins")
+                self.stats[player_index] += 1
+            print(self.players[player_index].name, self.stats[player_index],
+                  self.players[-player_index].name, self.stats[-player_index],
+                  "tie", self.stats[0])
 
 
 if __name__ == '__main__':
@@ -105,4 +116,4 @@ if __name__ == '__main__':
             player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
                                args.save_directory)
     # start the game
-    Arena(game, player1, player2)
+    Arena(game, player1, player2, print_actions=not args.self_train)

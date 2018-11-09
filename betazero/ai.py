@@ -16,7 +16,6 @@ class Agent:
                  model_path='model.h5',
                  save_interval=0,
                  save_dir='.'):
-        self.is_human = False
         self.game = game
         self.name = name
         self.model_path = model_path
