@@ -21,7 +21,7 @@ class Player:
 
 
 class Arena:
-    def __init__(self, game, player1, player2, print_actions=True):
+    def __init__(self, game, player1, player2, print_actions=True, go_first=True):
         self.game = game
         self.session = self.game.Session()
         self.players = (
@@ -36,7 +36,7 @@ class Arena:
         updates = self.session.reset()
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
-        first_turn = 1
+        first_turn = 1 if go_first else -1
         player_index = first_turn
         while True:
             if self.play_turn(player_index, print_actions):
@@ -96,6 +96,8 @@ if __name__ == '__main__':
         '--save-directory',
         default='.',
         help='folder to save model and logs')
+    parser.add_argument(
+        '-f', '--first-turn', action="store_true", help='player goes first')
     # parse and process command line arguments
     args = parser.parse_args()
     if not args.model:
@@ -125,4 +127,4 @@ if __name__ == '__main__':
             player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
                                args.save_directory)
     # start the game
-    Arena(game, player1, player2, print_actions=not args.self_train)
+    Arena(game, player1, player2, print_actions=not args.self_train, go_first=args.first_turn)
