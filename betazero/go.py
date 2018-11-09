@@ -1,18 +1,65 @@
 import numpy as np
 from .utils import ascii_board, parse_grid_input
 
-board_size = (9, 9)
-max_value = 20
+board_size = (5, 5)
+max_value = 6
 min_max = True
 rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
 terminal_state = False
-reward_span = 6
+reward_span = 4
+
+
+def ValueModel():
+    from keras.models import Model
+    from keras.layers import Conv2D, Dense, Flatten, Input
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.advanced_activations import LeakyReLU
+    from keras.layers.merge import Add
+    input_dimensions = (2, *board_size)
+    output_dimension = 13
+    filter_size = (3, 3)
+    n_filters = 128
+    n_res_blocks = 10
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(
+        n_filters, filter_size, padding='same',
+        data_format="channels_first")(inputs)
+    x = BatchNormalization()(x)
+    x = LeakyReLU()(x)
+    # residual blocks
+    for i in range(n_res_blocks):
+        x_in = x
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            data_format="channels_first")(x)
+        x = BatchNormalization()(x)
+        x = LeakyReLU()(x)
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            data_format="channels_first")(x)
+        x = BatchNormalization()(x)
+        x = Add()([x, x_in])
+        x = LeakyReLU()(x)
+    x = Conv2D(1, (1, 1), padding='same', data_format="channels_first")(x)
+    x = BatchNormalization()(x)
+    x = LeakyReLU()(x)
+    x = Flatten()(x)
+    x = Dense(n_filters, activation='selu')(x)
+    outputs = Dense(output_dimension, activation='softmax')(x)
+    model = Model(inputs, outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    print(model.summary())
+    return model
 
 
 # keras model, based on alphazero and mobilenetv2
-def ValueModel():
+def ValueModel_MNV2():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
