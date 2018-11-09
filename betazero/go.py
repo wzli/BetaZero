@@ -281,6 +281,7 @@ class Session:
                 self.reset()
             else:
                 self.turn_pass = True
+                self.ko = None
         else:
             if action:
                 board, group_lookup, captured_group = place_stone(
