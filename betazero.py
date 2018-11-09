@@ -30,23 +30,29 @@ class Arena:
             player2,
         )
         self.stats = [0, 0, 0]
+        self.score = 0
         self.self_train = player1 == player2
         updates = self.session.reset()
         for player_index in (1, -1):
             self.players[player_index].update_session(*updates)
+        first_turn = 1
+        player_index = first_turn
         while True:
-            for player_index in (1, -1):
-                self.play_turn(player_index, print_actions)
+            if self.play_turn(player_index, print_actions):
+                first_turn *= -1
+                player_index = first_turn
+            else:
+                player_index *= -1
 
     def play_turn(self, player_index, print_actions):
         player = self.players[player_index]
         action = player.generate_action(
-            explore=self.self_train, verbose=print_actions)
+            explore=not print_actions, verbose=print_actions)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION")
             action = player.generate_action(
-                explore=self.self_train, verbose=print_actions)
+                explore=not print_actions, verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
         for i in (1, -1):
             self.players[i].update_session(
@@ -61,9 +67,11 @@ class Arena:
             elif reward > 0:
                 print(player.name, "wins")
                 self.stats[player_index] += 1
-            print(self.players[player_index].name, self.stats[player_index],
-                  self.players[-player_index].name, self.stats[-player_index],
-                  "tie", self.stats[0])
+            self.score += reward * player_index
+            print(self.players[1].name, self.stats[1], self.players[-1].name,
+                  self.stats[-1], "tie", self.stats[0], "avg",
+                  self.score / sum(self.stats))
+        return reset > 1
 
 
 if __name__ == '__main__':
