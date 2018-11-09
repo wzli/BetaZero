@@ -23,7 +23,7 @@ class Agent:
         self.save_interval = save_interval
         self.save_time = time.time()
         self.save_counter = 0
-        self.total_sets = 0
+        self.total_moves = 0
         self.total_rewards = 0
 
         # get value model
@@ -68,17 +68,17 @@ class Agent:
         ]
 
     def train_set(self, training_set, original_training_set):
-        if (self.save_interval >
-                0) and (self.save_interval == self.save_counter):
+        if (self.save_interval > 0) and (self.save_counter >=
+                                         self.save_interval):
             self.save_counter = 0
             self.value_model.fit(
                 *training_set,
                 verbose=0,
                 validation_split=0.99,
                 callbacks=self.training_callbacks)
-            print(self.name, "model saved at set", self.total_sets)
-            print("reward/set", self.total_rewards / self.total_sets)
-            print("time elapsed", time.time() - self.save_time)
+            print(self.name, "model saved at move", self.total_moves)
+            print("reward/move", self.total_rewards / self.total_moves)
+            print("time elapsed", time.time() - self.save_time, "s")
             self.save_time = time.time()
             self.value_model.save(
                 os.path.join(self.model_save_dir,
@@ -91,8 +91,9 @@ class Agent:
                       "step", i + 1, "\n")
         else:
             self.value_model.fit(*training_set, verbose=0)
-        self.total_sets += 1
-        self.save_counter += 1
+        n_moves = len(original_training_set[0])
+        self.total_moves += n_moves
+        self.save_counter += n_moves
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:

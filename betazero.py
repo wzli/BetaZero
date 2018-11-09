@@ -70,7 +70,7 @@ if __name__ == '__main__':
         '--save-interval',
         type=int,
         default=1000,
-        help='save model every i sets')
+        help='save model every i moves trained, zero disables autosave')
     parser.add_argument(
         '-d',
         '--save-directory',

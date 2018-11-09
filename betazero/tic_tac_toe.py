@@ -15,7 +15,7 @@ reward_span = 0
 #simple fully connected network
 def ValueModel():
     from keras.models import Sequential
-    from keras.layers import Conv2D, Dense, Flatten
+    from keras.layers import Dense, Flatten
 
     input_dimensions = (1, *board_size)
     output_dimension = 3

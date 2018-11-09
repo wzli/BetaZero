@@ -399,14 +399,15 @@ class State:
     def array(self):
         board_array = np.zeros((8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
-            if piece != 0:
+            if piece != EMPTY:
                 piece_player = get_player(piece)
                 board_array[piece, location[0], location[
                     1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
-                    board_array[0, move[0], move[
-                        1]] = rewards_lookup[self.
-                                             board[move]] * piece_player * self.player
+                    if board[move] != EMPTY:
+                        board_array[0, move[0], move[
+                            1]] = rewards_lookup[self.
+                                                 board[move]] * piece_player * self.player
         return board_array[np.newaxis]
 
     def key(self):
