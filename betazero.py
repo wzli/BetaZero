@@ -29,12 +29,13 @@ class Arena:
             player1,
             player2,
         )
+        self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0
         self.self_train = player1 == player2
         updates = self.session.reset()
-        for player_index in (1, -1):
-            self.players[player_index].update_session(*updates)
+        for unique_player in self.unique_players:
+            unique_player.update_session(*updates)
         first_turn = 1
         player_index = first_turn
         while True:
@@ -54,8 +55,8 @@ class Arena:
             action = player.generate_action(
                 explore=not print_actions, verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
-        for i in (1, -1):
-            self.players[i].update_session(
+        for unique_player in self.unique_players:
+            unique_player.update_session(
                 state, reward, reset, train=self.self_train)
         if not self.self_train and reset > 1:
             if reward == 0:
