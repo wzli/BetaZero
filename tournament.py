@@ -34,11 +34,23 @@ def play_match(game, player1, player2, model_path, matches=2):
 
 
 def adjust_elo(elo_record, winner, loser, k):
-    rating_gap = (elo_record[winner] - elo_record[loser]) / 400
+    rating_gap = (elo_record.setdefault(winner, 0) - elo_record.setdefault(
+        loser, 0)) / 400
     p_winner = 1.0 / (1.0 + 10**-rating_gap)
     p_loser = 1.0 - p_winner
     elo_record[winner] += k * (1 - p_winner)
     elo_record[loser] -= k * p_loser
+
+
+def scan_models(directory):
+    models = set()
+    for path in os.listdir(directory):
+        name, ext = os.path.splitext(path)
+        if ext == ".h5":
+            tokens = name.split("_")
+            if tokens[0] == "model" and tokens[1].isdigit():
+                models.add(int(tokens[1]))
+    return models
 
 
 if __name__ == '__main__':
@@ -75,24 +87,16 @@ if __name__ == '__main__':
         from betazero import chinese_chess as game
     elif args.game == games[2]:
         from betazero import tic_tac_toe as game
-    # find models matching names "model_[ts].h5"
-    models = set()
-    for path in os.listdir(args.model_directory):
-        name, ext = os.path.splitext(path)
-        if ext == ".h5":
-            tokens = name.split("_")
-            if tokens[0] == "model" and tokens[1].isdigit():
-                models.add(int(tokens[1]))
     # read/create elo_record yaml file
     file_mode = 'r+' if os.path.exists(args.elo_record) else 'w+'
     with open(args.elo_record, file_mode) as elo_record_yaml:
         # load stats from yaml file
         elo_record = yaml.load(elo_record_yaml) or {}
+        # find models matching names "model_[ts].h5"
+        models = scan_models(args.model_directory)
         # see which models have an existing record
         old_models = models & elo_record.keys()
         new_models = models - old_models
-        for new_model in new_models:
-            elo_record[new_model] = 0
         # add old models to queue, sorted by decending elo
         challenger_queue = deque(
             sorted(old_models, key=elo_record.get, reverse=True))
@@ -100,12 +104,16 @@ if __name__ == '__main__':
         if old_models:
             champion = challenger_queue.popleft()
         # add new models to front of queue, sorted by decending timestamp
-        challenger_queue.extend(sorted(new_models, reverse=True))
+        challenger_queue.extendleft(sorted(new_models, reverse=True))
         # pickout most recent if no models have a record
         if not old_models:
             champion = challenger_queue.popleft()
         # keep playing matches, winner stays on
         while True:
+            scanned_models = scan_models(args.model_directory)
+            challenger_queue.extendleft(
+                sorted(scanned_models - models, reverse=True))
+            models = scanned_models
             challenger = challenger_queue.popleft()
             champion, loser = play_match(game, challenger, champion,
                                          args.model_directory, args.matches)
