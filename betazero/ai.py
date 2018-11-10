@@ -38,7 +38,7 @@ class Agent:
             save_dir, os.path.basename(self.model_path)) + ".save"
 
         # create save path if doesn't exist
-        if not os.path.exists(self.model_save_dir):
+        if self.save_interval > 1 and not os.path.exists(self.model_save_dir):
             print("Save directory", self.model_save_dir,
                   "doesn't exist -> create new folder")
             os.makedirs(self.model_save_dir)
