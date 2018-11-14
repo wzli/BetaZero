@@ -37,12 +37,6 @@ class Agent:
         self.model_save_dir = os.path.join(
             save_dir, os.path.basename(self.model_path)) + ".save"
 
-        # create save path if doesn't exist
-        if self.save_interval > 1 and not os.path.exists(self.model_save_dir):
-            print("Save directory", self.model_save_dir,
-                  "doesn't exist -> create new folder")
-            os.makedirs(self.model_save_dir)
-
         # compute constants
         self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
             game.vertical_symetry) + 1) * (int(game.horizontal_symetry) + 1))
@@ -55,20 +49,28 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
-        # setup tensorboard callback
-        from keras.callbacks import TensorBoard
-        self.training_callbacks = [
-            TensorBoard(
-                log_dir=self.model_save_dir,
-                histogram_freq=1,
-                write_graph=False,
-                write_grads=False,
-                write_images=True)
-        ]
 
     def train_set(self, training_set, original_training_set):
         if (self.save_interval > 0) and (self.save_counter >=
                                          self.save_interval):
+            try:
+                self.training_callbacks
+            except AttributeError:
+                # setup tensorboard callback
+                from keras.callbacks import TensorBoard
+                self.training_callbacks = [
+                    TensorBoard(
+                        log_dir=self.model_save_dir,
+                        histogram_freq=1,
+                        write_graph=False,
+                        write_grads=True,
+                        write_images=True)
+                ]
+                # create save directory if doesn't exist
+                if not os.path.exists(self.model_save_dir):
+                    print("Save directory", self.model_save_dir,
+                          "doesn't exist -> create new folder")
+                    os.makedirs(self.model_save_dir)
             self.save_counter = 0
             self.value_model.fit(
                 *training_set,
@@ -77,11 +79,12 @@ class Agent:
                 callbacks=self.training_callbacks)
             print(self.name, "model saved at move", self.total_moves)
             print("reward/move", self.total_rewards / self.total_moves)
-            print("time elapsed", time.time() - self.save_time, "s")
+            print("time elapsed", time.time() - self.save_time, "seconds")
             self.save_time = time.time()
             self.value_model.save(
                 os.path.join(self.model_save_dir,
                              "model_" + str(int(self.save_time)) + '.h5'))
+            self.value_model.save(self.model_path)
             for i, (x, y) in enumerate(zip(*original_training_set)):
                 expected, variance = expected_value(y, self.value_range, True)
                 expected = round(expected, 3)

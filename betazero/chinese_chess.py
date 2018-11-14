@@ -24,7 +24,7 @@ def ValueModel():
     output_dimension = 51
     n_filters = 128
     expansion_factor = 5
-    n_res_blocks = 20
+    n_res_blocks = 10
     batch_norm_momentum = 0.999
     l2_reg = 1e-5
 
@@ -404,7 +404,7 @@ class State:
                 board_array[piece, location[0], location[
                     1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
-                    if board[move] != EMPTY:
+                    if self.board[move] != EMPTY:
                         board_array[0, move[0], move[
                             1]] = rewards_lookup[self.
                                                  board[move]] * piece_player * self.player

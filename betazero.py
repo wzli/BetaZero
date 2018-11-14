@@ -24,7 +24,7 @@ if __name__ == '__main__':
     # create command line arguments
     games = ['go', 'chinese_chess', 'tic_tac_toe']
     parser = argparse.ArgumentParser(description='BetaZero App')
-    parser.add_argument('-g', "--game", choices=games, default='tic_tac_toe')
+    parser.add_argument("game", choices=games, help='select game')
     parser.add_argument(
         '-s', '--self-train', action="store_true", help='self training mode')
     parser.add_argument('-m', '--model', help='path to the hdf5 model file')
