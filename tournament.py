@@ -1,4 +1,4 @@
-#usr/bin/python3
+#!/usr/bin/env python3
 import argparse, os, yaml
 from collections import deque
 from betazero import ai, utils
@@ -18,6 +18,7 @@ def play_match(game, player1, player2, model_path, matches=2):
         agents[player2],
         print_actions=False,
         matches=matches)
+    print("")
     if arena.stats[1] > arena.stats[-1]:
         winner = player1
         loser = player2
