@@ -202,8 +202,6 @@ def ValueModel():
     return model
 
 
-
-
 # go helpers
 def get_adjacent(index):
     row, col = index

@@ -46,8 +46,9 @@ class Agent:
             save_dir, os.path.basename(self.model_path)) + ".save"
 
         # compute constants
-        self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
-            game.vertical_symetry) + 1) * (int(game.horizontal_symetry) + 1))
+        self.symetric_set_size = ((int(game.rotational_symetry) + 1) *
+                                  (int(game.vertical_symetry) + 1) *
+                                  (int(game.horizontal_symetry) + 1))
 
         self.value_range = np.linspace(
             -game.max_value, game.max_value,
@@ -56,7 +57,6 @@ class Agent:
         # history lists
         self.state_history = []
         self.action_prediction_history = []
-
 
     def train_set(self, training_set, original_training_set):
         if (self.save_interval > 0) and (self.save_counter >=
@@ -118,8 +118,9 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = (state_transition.array()
-                        for state_transition in state_transitions)
+        input_arrays = [
+            state_transition.array() for state_transition in state_transitions
+        ]
         # use model to predict the value pdf of each action in action space
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
@@ -156,10 +157,10 @@ class Agent:
                                                     self.value_range, True)
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
-                print('ACT:',
-                      action_choice, '\tRWD:', action_reward, '\t\tSMP',
-                      round(value_sample,
-                            3), '\tEXP', expected, '\tSTD:', deviation)
+                print('ACT:', action_choice, '\tRWD:', action_reward, ""
+                      if self.save_interval == 0 else
+                      '\t\tSMP ' + str(round(value_sample, 3)), '\tEXP',
+                      expected, '\tSTD:', deviation)
             print(self.name, "played", action)
         return action
 
@@ -242,11 +243,11 @@ class Agent:
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
                                                                             -reset_count
-                                                                            -
-                                                                            1]
+                                                                            - 1]
             # re-predict actions for initial state after training
-            action_predictions = self.generate_predictions(self.state_history[
-                -1].flip() if self.game.min_max else self.state_history[-1])
+            action_predictions = self.generate_predictions(
+                self.state_history[-1].flip()
+                if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
         elif train and reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
@@ -254,5 +255,5 @@ class Agent:
                                                       False)
             self.train_set(*training_set)
         elif not self.action_prediction_history[-1]:
-            raise ValueError(self.name +
-                             ": no more actions but game doesn't reset")
+            raise ValueError(
+                self.name + ": no more actions but game doesn't reset")

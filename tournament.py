@@ -35,8 +35,9 @@ def play_match(game, player1, player2, model_path, matches=2):
 
 
 def adjust_elo(elo_record, winner, loser, k):
-    rating_gap = (elo_record.setdefault(winner, 0) - elo_record.setdefault(
-        loser, 0)) / 400
+    rating_gap = (
+        elo_record.setdefault(winner, 0) - elo_record.setdefault(loser, 0)
+    ) / 400
     p_winner = 1.0 / (1.0 + 10**-rating_gap)
     p_loser = 1.0 - p_winner
     elo_record[winner] += k * (1 - p_winner)

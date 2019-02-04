@@ -81,9 +81,7 @@ def parse_grid_input(board_size):
         if input_str == "":
             return None
         try:
-            move_index = tuple(
-                int(token)
-                for token in input_str.split(' '))
+            move_index = tuple(int(token) for token in input_str.split(' '))
         except ValueError:
             print("INTEGER PARSING ERROR")
             continue

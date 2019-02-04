@@ -224,8 +224,8 @@ def elephant_moves(board, location):
         move for move in ((row + 2, col + 2), (row + 2, col - 2),
                           (row - 2, col + 2), (row - 2, col - 2))
         if is_valid_move(board, player, move)
-        and not is_across_river(player, move)
-        and board[(move[0] + row) // 2, (move[1] + col) // 2] == EMPTY
+        and not is_across_river(player, move) and board[(move[0] + row) // 2, (
+            move[1] + col) // 2] == EMPTY
     ]
 
 
@@ -405,9 +405,8 @@ class State:
                     1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
                     if self.board[move] != EMPTY:
-                        board_array[0, move[0], move[
-                            1]] = rewards_lookup[self.
-                                                 board[move]] * piece_player * self.player
+                        board_array[0, move[0], move[1]] = rewards_lookup[
+                            self.board[move]] * piece_player * self.player
         return board_array[np.newaxis]
 
     def key(self):
@@ -424,7 +423,8 @@ class State:
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     banned_move = get_banned_move(state.move_history)
-    return [(location, move) for location, piece in np.ndenumerate(state.board)
+    return [(location, move)
+            for location, piece in np.ndenumerate(state.board)
             if get_player(piece) == state.player
             for move in moves_lookup[piece](state.board, location)
             if (location, move) != banned_move]
