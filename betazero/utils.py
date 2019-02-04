@@ -77,10 +77,13 @@ def ascii_board(board):
 
 def parse_grid_input(board_size):
     while True:
+        input_str = input('enter "row col ...": ')
+        if input_str == "":
+            return None
         try:
             move_index = tuple(
                 int(token)
-                for token in input('enter "row col ...": ').split(' '))
+                for token in input_str.split(' '))
         except ValueError:
             print("INTEGER PARSING ERROR")
             continue
