@@ -173,7 +173,7 @@ class Agent:
         # generate input set based on recent history
         original_input_set = self.state_history[-steps:]
         training_input_set = np.vstack(
-            (input_state.array() for input_state in original_input_set))
+            [input_state.array() for input_state in original_input_set])
         # generate symetric input arrays
         training_input_set = np.vstack(
             symetric_arrays(training_input_set, self.game.rotational_symetry,
