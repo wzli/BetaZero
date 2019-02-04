@@ -82,6 +82,7 @@ class Agent:
             self.save_counter = 0
             self.value_model.fit(
                 *training_set,
+                batch_size=len(training_set),
                 verbose=0,
                 validation_split=0.99,
                 callbacks=self.training_callbacks)
@@ -100,7 +101,7 @@ class Agent:
                 print(x, "\nexpected value", expected, "deviation", deviation,
                       "step", i + 1, "\n")
         else:
-            self.value_model.fit(*training_set, verbose=0)
+            self.value_model.fit(*training_set, batch_size=len(training_set), verbose=0)
         n_moves = len(original_training_set[0])
         self.total_moves += n_moves
         self.save_counter += n_moves
@@ -122,7 +123,7 @@ class Agent:
             state_transition.array() for state_transition in state_transitions
         ]
         # use model to predict the value pdf of each action in action space
-        value_pdfs = self.value_model.predict(np.vstack(input_arrays))
+        value_pdfs = self.value_model.predict(np.vstack(input_arrays), batch_size=len(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
     def generate_action(self, state=None, verbose=False):
