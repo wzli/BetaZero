@@ -103,7 +103,7 @@ class Arena:
                  player1,
                  player2,
                  print_actions=True,
-                 go_first=True,
+                 first_turn=1,
                  matches=-1):
         self.game = game
         self.session = self.game.Session()
@@ -115,34 +115,31 @@ class Arena:
         self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0
-        self.self_train = player1 == player2
+        self.first_turn = first_turn
+        self.matches = matches
         updates = self.session.reset()
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
-        first_turn = 1 if go_first else -1
-        player_index = first_turn
-        while matches != 0:
+        player_index = self.first_turn
+        while self.matches != 0:
             if self.play_turn(player_index, print_actions):
-                first_turn *= -1
-                player_index = first_turn
-                matches -= 1
+                self.first_turn *= -1
+                player_index = self.first_turn
+                self.matches -= 1
             else:
                 player_index *= -1
 
     def play_turn(self, player_index, print_actions):
         player = self.players[player_index]
-        action = player.generate_action(
-            explore=not print_actions, verbose=print_actions)
+        action = player.generate_action(verbose=print_actions)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION")
-            action = player.generate_action(
-                explore=not print_actions, verbose=print_actions)
+            action = player.generate_action(verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
         for unique_player in self.unique_players:
-            unique_player.update_session(
-                state, reward, reset, train=self.self_train)
-        if not self.self_train and reset > 1:
+            unique_player.update_session(state, reward, reset)
+        if len(self.unique_players) > 1 and reset > 1:
             if reward == 0:
                 print("tie")
                 self.stats[0] += 1

@@ -25,17 +25,15 @@ if __name__ == '__main__':
     games = ['go', 'chinese_chess', 'tic_tac_toe']
     parser = argparse.ArgumentParser(description='BetaZero App')
     parser.add_argument("game", choices=games, help='select game')
-    parser.add_argument(
-        '-s', '--self-train', action="store_true", help='self training mode')
     parser.add_argument('-m', '--model', help='path to the hdf5 model file')
     parser.add_argument(
-        '-a', '--adversary', help='path to the adversary hdf5 model file')
-    parser.add_argument(
-        '-i',
+        '-s',
         '--save-interval',
         type=int,
-        default=1000,
-        help='save model every i moves trained, zero disables autosave')
+        default=0,
+        help='save model every i moves trained, zero disables training')
+    parser.add_argument(
+        '-a', '--adversary', help='path to the adversary hdf5 model file')
     parser.add_argument(
         '-d',
         '--save-directory',
@@ -56,7 +54,8 @@ if __name__ == '__main__':
     elif args.game == games[2]:
         from betazero import tic_tac_toe as game
     # logic to decide who is playing
-    if args.self_train:
+    train = args.save_interval > 0
+    if train:
         player1 = ai.Agent(game, "Agent", args.model, args.save_interval,
                            args.save_directory)
         if args.adversary:
@@ -76,5 +75,5 @@ if __name__ == '__main__':
         game,
         player1,
         player2,
-        print_actions=not args.self_train,
-        go_first=args.first_turn)
+        print_actions=not train,
+        first_turn= 1 if args.first_turn else -1)

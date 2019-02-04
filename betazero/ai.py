@@ -124,7 +124,7 @@ class Agent:
         value_pdfs = self.value_model.predict(np.vstack(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, explore=True, state=None, verbose=False):
+    def generate_action(self, state=None, verbose=False):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
         predictions = self.generate_predictions(
@@ -136,7 +136,7 @@ class Agent:
         # if explore, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
         # othersize, don't sample, just take the expected value
-        if explore:
+        if self.save_interval > 0:
             value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
             value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
@@ -219,7 +219,7 @@ class Agent:
         return (training_input_set, training_target_set), (original_input_set,
                                                            original_target_set)
 
-    def update_session(self, state, reward, reset_count, train=True):
+    def update_session(self, state, reward, reset_count):
         if reset_count < 0:
             raise ValueError(self.name + ": reset_count < 0")
         # save in history
@@ -231,6 +231,7 @@ class Agent:
         action_predictions = self.generate_predictions(
             state.flip() if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
+        train = self.save_interval > 0
         if reset_count != 0:
             if train:
                 # if the game resets, train the network
