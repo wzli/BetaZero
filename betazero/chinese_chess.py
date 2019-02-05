@@ -8,12 +8,68 @@ rotational_symetry = False
 vertical_symetry = True
 horizontal_symetry = True
 terminal_state = True
-reward_span = 6
+reward_span = 10
 max_stalemate_count = 30
 
 
-# keras model, based on alphazero and mobilenetv2
 def ValueModel():
+    from keras.models import Model
+    from keras import regularizers
+    from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.merge import Add
+
+    input_dimensions = (8, *board_size)
+    output_dimension = 2 * max_value + 1
+    filter_size = (3, 3)
+    n_filters = 128
+    n_res_blocks = 20
+    batch_norm_momentum = 0.999
+    l2_reg = 1e-4
+
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(
+        n_filters,
+        filter_size,
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        data_format="channels_first")(inputs)
+    # residual blocks
+    for i in range(n_res_blocks):
+        x_in = x
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6.)(x)
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg),
+            data_format="channels_first")(x)
+        x = Add()([x, x_in])
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = Conv2D(
+        1, (1, 1),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        data_format="channels_first")(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = Flatten()(x)
+    outputs = Dense(
+        output_dimension,
+        activation='softmax',
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
+    model = Model(inputs, outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    return model
+
+
+# keras model, based on alphazero and mobilenetv2
+def ValueModelMNV2():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
