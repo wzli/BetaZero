@@ -58,61 +58,63 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
+        # setup tensorboard callback
+        from keras.callbacks import TensorBoard
+        self.training_callbacks = [
+            TensorBoard(
+                log_dir=self.model_save_dir,
+                histogram_freq=1,
+                write_graph=False,
+                write_grads=True,
+                write_images=True)
+        ]
+
         # train on a seperate thread
         self.value_model._make_train_function()
+        self.value_model._make_test_function()
         self.training_queue = queue.Queue(10)
         self.training_thread = threading.Thread(target=self.training_loop)
         self.training_thread.daemon = True
         self.training_thread.start()
 
     def training_loop(self):
+        # main loop for training thread
         while True:
             training_set, original_training_set = self.training_queue.get()
-            if (self.save_interval > 0) and (self.save_counter >=
-                                             self.save_interval):
-                try:
-                    self.training_callbacks
-                except AttributeError:
-                    # setup tensorboard callback
-                    from keras.callbacks import TensorBoard
-                    self.training_callbacks = [
-                        TensorBoard(
-                            log_dir=self.model_save_dir,
-                            histogram_freq=1,
-                            write_graph=False,
-                            write_grads=True,
-                            write_images=True)
-                    ]
-                    # create save directory if doesn't exist
-                    if not os.path.exists(self.model_save_dir):
-                        print("Save directory", self.model_save_dir,
-                              "doesn't exist -> create new folder")
-                        os.makedirs(self.model_save_dir)
-                self.save_counter = 0
-                self.value_model.fit(
-                    *training_set,
-                    verbose=0,
-                    validation_split=0.99,
-                    callbacks=self.training_callbacks)
-                print(self.name, "model saved at move", self.total_moves)
-                print("reward/move", self.total_rewards / self.total_moves)
-                print("time elapsed", time.time() - self.save_time, "seconds")
-                self.save_time = time.time()
-                self.value_model.save(
-                    os.path.join(self.model_save_dir,
-                                 "model_" + str(int(self.save_time)) + '.h5'))
-                self.value_model.save(self.model_path)
-                for i, (x, y) in enumerate(zip(*original_training_set)):
-                    expected, variance = expected_value(y, self.value_range, True)
-                    expected = round(expected, 3)
-                    deviation = round(variance**0.5, 3)
-                    print(x, "\nexpected value", expected, "deviation", deviation,
-                          "step", i + 1, "\n")
-            else:
-                self.value_model.fit(*training_set, verbose=0)
+            self.value_model.fit(*training_set, verbose=0)
             n_moves = len(original_training_set[0])
             self.total_moves += n_moves
             self.save_counter += n_moves
+
+    def save_model(self, training_set, original_training_set):
+        # create save directory if doesn't exist
+        if not os.path.exists(self.model_save_dir):
+            print("Save directory", self.model_save_dir,
+                  "doesn't exist -> create new folder")
+            os.makedirs(self.model_save_dir)
+        # reset save counter
+        self.save_counter = 0
+        # use keras tensorboard callback for logging
+        self.value_model.fit(
+            *training_set,
+            verbose=0,
+            validation_split=0.99,
+            callbacks=self.training_callbacks)
+        # print most recent game history
+        print(self.name, "model saved at move", self.total_moves)
+        print("reward/move", self.total_rewards / self.total_moves)
+        print("time elapsed", time.time() - self.save_time, "seconds")
+        self.save_time = time.time()
+        self.value_model.save(
+            os.path.join(self.model_save_dir,
+                         "model_" + str(int(self.save_time)) + '.h5'))
+        self.value_model.save(self.model_path)
+        for i, (x, y) in enumerate(zip(*original_training_set)):
+            expected, variance = expected_value(y, self.value_range, True)
+            expected = round(expected, 3)
+            deviation = round(variance**0.5, 3)
+            print(x, "\nexpected value", expected, "deviation", deviation,
+                  "step", i + 1, "\n")
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:
@@ -247,7 +249,11 @@ class Agent:
                 # if the game resets, train the network
                 training_set = self.generate_training_set(
                     reset_count, self.game.terminal_state)
-                self.training_queue.put(training_set)
+                # save model if counter is reached
+                if self.save_counter < self.save_interval:
+                    self.training_queue.put(training_set)
+                else:
+                    self.save_model(*training_set);
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
