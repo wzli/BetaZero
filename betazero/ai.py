@@ -133,7 +133,8 @@ class Agent:
             state_transition.array() for state_transition in state_transitions
         ]
         # use model to predict the value pdf of each action in action space
-        value_pdfs = self.value_model.predict(np.vstack(input_arrays), batch_size=len(input_arrays))
+        value_pdfs = self.value_model.predict(
+            np.vstack(input_arrays), batch_size=len(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
     def generate_action(self, state=None, verbose=False):
@@ -253,7 +254,7 @@ class Agent:
                 if self.save_counter < self.save_interval:
                     self.training_queue.put(training_set)
                 else:
-                    self.save_model(*training_set);
+                    self.save_model(*training_set)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
