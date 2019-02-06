@@ -497,4 +497,4 @@ def predict_action(state, action):
 
 
 def get_human_action():
-    return tuple(parse_grid_input(board_size), parse_grid_input(board_size))
+    return parse_grid_input(board_size), parse_grid_input(board_size)
