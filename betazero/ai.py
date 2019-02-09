@@ -85,6 +85,7 @@ class Agent:
             n_moves = len(original_training_set[0])
             self.total_moves += n_moves
             self.save_counter += n_moves
+            self.training_queue.task_done()
 
     def save_model(self, training_set, original_training_set):
         # create save directory if doesn't exist
