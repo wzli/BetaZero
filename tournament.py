@@ -76,7 +76,7 @@ if __name__ == '__main__':
         "--n-participants",
         default=15,
         type=int,
-        help='number of matchs per playoff')
+        help='number of participants in the tornament (excess will be eliminated)')
     parser.add_argument(
         '-m',
         "--matches",
