@@ -60,6 +60,7 @@ class TournamentParticipant:
         self.id = agent_id
         self.agent = ai.Agent(tournament.game, str(agent_id),
                 os.path.join(model_directory, "model_" + str(agent_id) + ".h5"))
+        tournament.participants.append(self)
 
     def __lt__(self, opponent):
         winner, loser = tournament.playoff(self, opponent)
@@ -113,7 +114,10 @@ if __name__ == '__main__':
         models = scan_models(args.model_directory)
         # initialize participants
         for model in models - record["eliminated"]:
-            tournament.participants.append(TournamentParticipant(tournament, args.model_directory, model))
+            try:
+                TournamentParticipant(tournament, args.model_directory, model)
+            except Exception as e:
+                print(e)
         while True:
             # print current record
             print("Rankings:")
@@ -125,7 +129,10 @@ if __name__ == '__main__':
             # scan for new participants to add to the tournament
             scanned_models = scan_models(args.model_directory) - record["eliminated"]
             for model in scanned_models - models:
-                tournament.participants.append(TournamentParticipant(tournament, args.model_directory, model))
+                try:
+                    TournamentParticipant(tournament, args.model_directory, model)
+                except Exception as e:
+                    print(e)
             models = scanned_models
             tournament.run_once(args.matches)
             eliminated_participants = tournament.eliminate(args.n_participants)
