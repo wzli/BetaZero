@@ -3,6 +3,7 @@ import argparse, os, yaml
 from heapq import heapify, heapreplace
 from betazero import ai, utils
 
+
 def scan_models(directory):
     models = set()
     for path in os.listdir(directory):
@@ -12,6 +13,7 @@ def scan_models(directory):
             if tokens[0] == "model" and tokens[1].isdigit():
                 models.add(int(tokens[1]))
     return models
+
 
 class Tournament:
     def __init__(self, game):
@@ -54,18 +56,21 @@ class Tournament:
         self.participants = self.participants[:n_remaining]
         return eliminated
 
+
 class TournamentParticipant:
     def __init__(self, tournament, model_directory, agent_id):
         self.tournament = tournament
         self.id = agent_id
         self.agent = ai.Agent(tournament.game, str(agent_id),
-                os.path.join(model_directory, "model_" + str(agent_id) + ".h5"))
+                              os.path.join(model_directory,
+                                           "model_" + str(agent_id) + ".h5"))
         tournament.participants.append(self)
 
     def __lt__(self, opponent):
         winner, loser = tournament.playoff(self, opponent)
         # it's a min heap, less is good
         return winner.id == self.id
+
 
 if __name__ == '__main__':
     # create command line arguments
@@ -77,7 +82,8 @@ if __name__ == '__main__':
         "--n-participants",
         default=15,
         type=int,
-        help='number of participants in the tornament (excess will be eliminated)')
+        help=
+        'number of participants in the tornament (excess will be eliminated)')
     parser.add_argument(
         '-m',
         "--matches",
@@ -109,7 +115,10 @@ if __name__ == '__main__':
     file_mode = 'r+' if os.path.exists(args.record_file) else 'w+'
     with open(args.record_file, file_mode) as record_yaml:
         # load record from yaml file
-        record = yaml.load(record_yaml) or {"participants":[], "eliminated":set()}
+        record = yaml.load(record_yaml) or {
+            "participants": [],
+            "eliminated": set()
+        }
         # find models matching names "model_[ts].h5"
         models = scan_models(args.model_directory)
         # initialize participants
@@ -127,17 +136,23 @@ if __name__ == '__main__':
                 print("e\t", participant)
             print("")
             # scan for new participants to add to the tournament
-            scanned_models = scan_models(args.model_directory) - record["eliminated"]
+            scanned_models = scan_models(
+                args.model_directory) - record["eliminated"]
             for model in scanned_models - models:
                 try:
-                    TournamentParticipant(tournament, args.model_directory, model)
+                    TournamentParticipant(tournament, args.model_directory,
+                                          model)
                 except Exception as e:
                     print(e)
             models = scanned_models
             tournament.run_once(args.matches)
             eliminated_participants = tournament.eliminate(args.n_participants)
-            record["participants"] = [participant.id for participant in tournament.participants]
-            record["eliminated"].update({participant.id for participant in eliminated_participants})
+            record["participants"] = [
+                participant.id for participant in tournament.participants
+            ]
+            record["eliminated"].update(
+                {participant.id
+                 for participant in eliminated_participants})
             # record the record
             record_yaml.seek(0)
             record_yaml.truncate()
