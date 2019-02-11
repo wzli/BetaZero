@@ -9,6 +9,7 @@ vertical_symetry = True
 horizontal_symetry = True
 terminal_state = False
 reward_span = 10
+max_turns = board_size[0] * board_size[1] * 2
 
 
 # keras model, based on alphazero and mobilenetv2
@@ -371,6 +372,10 @@ class Session:
             else:
                 self.turn_pass = True
                 self.ko = None
+            # end the game after a turn limit
+            if self.n_turns > max_turns:
+                reset = self.n_turns
+                self.reset()
         else:
             if action:
                 board, group_lookup, captured_group = place_stone(
