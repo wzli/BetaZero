@@ -105,8 +105,8 @@ class TournamentParticipant:
         if not opponent.agent:
             opponent.create_agent()
         winner, loser = tournament.playoff(self, opponent)
-        # it's a min heap, less is good
         adjust_elo(winner, loser)
+        # it's a min heap, less is good
         return winner.id == self.id
 
 
