@@ -153,7 +153,7 @@ if __name__ == '__main__':
             print("Rankings:")
             for rank, participant in enumerate(record["participants"]):
                 print("rank", rank, "\tid", participant, "\telo",
-                      record["elo_stats"][participant])
+                      record["elo_stats"].setdefault(participant, 0))
             print("")
             # scan for new participants to add to the tournament
             current_models = scan_models(
