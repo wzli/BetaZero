@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse, os, yaml
-from heapq import heapify, heappush, heappop
+from heapq import heapify, heappop
+from random import shuffle
 from betazero import ai, utils
 
 
@@ -20,20 +21,14 @@ class Tournament:
         self.game = game
         self.participants = []
 
-    def add_participants(self, model_directory, model_entries,
-                         ranking_matches):
+    def add_participants(self, model_directory, model_entries):
         # iterate models
         for model, elo in model_entries:
             try:
                 # initialize participants
                 participant = TournamentParticipant(self, model_directory,
                                                     model, elo)
-                # decide whether to play initial ranking matches
-                if ranking_matches == 0:
-                    self.participants.append(participant)
-                else:
-                    self.matches = ranking_matches
-                    heappush(self.participants, participant)
+                self.participants.append(participant)
             except Exception as e:
                 print(e)
 
@@ -62,10 +57,14 @@ class Tournament:
 
     def run_once(self, matches):
         self.matches = matches
-        # de-throne the champion, helps balance the heap
+        # de-throne the champion to verify ability to climb back up
         champion = heappop(self.participants)
-        # verify the champion's ability to climb back to the top
-        heappush(self.participants, champion)
+        self.participants.append(champion)
+        # shuffle bottom layer of participants
+        mid_index = len(self.participants) // 2
+        bottom_layer = self.participants[mid_index:]
+        shuffle(bottom_layer)
+        self.participants = self.participants[:mid_index] + bottom_layer
         # playoff every section of the tournament
         heapify(self.participants)
 
@@ -160,17 +159,15 @@ if __name__ == '__main__':
         # find models matching names "model_[ts].h5"
         models = scan_models(
             args.model_directory) - record["eliminated"].keys()
-        new_models = models - set(model
-                                  for model, elo in record["participants"])
+        new_models = models - set(
+            participant_record["id"]
+            for participant_record in record["participants"])
         # initialize participants
-        model_entries = [
-            participant_entry for participant_entry in record["participants"]
-            if participant_entry[0] in models
-        ]
-        tournament.add_participants(args.model_directory, model_entries, 0)
-        new_model_entries = [(new_model, 0) for new_model in new_models]
-        tournament.add_participants(args.model_directory, new_model_entries,
-                                    args.matches)
+        model_entries = [(participant_record["id"], participant_record["elo"])
+                         for participant_record in record["participants"]
+                         if participant_record["id"] in models
+                         ] + [(new_model, 0) for new_model in new_models]
+        tournament.add_participants(args.model_directory, model_entries)
         while True:
             # print current record
             print("Rankings:")
@@ -183,17 +180,19 @@ if __name__ == '__main__':
                 args.model_directory) - record["eliminated"].keys()
             # add newly scanned models to the tournament
             model_entries = [(model, 0) for model in current_models - models]
-            tournament.add_participants(args.model_directory, model_entries,
-                                        args.matches)
+            tournament.add_participants(args.model_directory, model_entries)
             models = current_models
             # run the tournament
             tournament.run_once(args.matches)
             # eliminate losers
             eliminated_participants = tournament.eliminate(args.n_participants)
+            # refresh record
+            record = yaml.load(record_yaml)
             # parse remaining participants to record
-            record["participants"] = [[
-                participant.id, participant.elo
-            ] for participant in tournament.participants]
+            record["participants"] = [{
+                "id": participant.id,
+                "elo": participant.elo
+            } for participant in tournament.participants]
             # parse eliminated participants to record
             record["eliminated"].update({
                 participant.id: participant.elo
