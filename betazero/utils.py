@@ -100,6 +100,7 @@ class Arena:
                  game,
                  player1,
                  player2,
+                 explore=False,
                  print_actions=True,
                  first_turn=1,
                  matches=-1):
@@ -120,20 +121,20 @@ class Arena:
             unique_player.update_session(*updates)
         player_index = self.first_turn
         while self.matches != 0:
-            if self.play_turn(player_index, print_actions):
+            if self.play_turn(player_index, explore, print_actions):
                 self.first_turn *= -1
                 player_index = self.first_turn
                 self.matches -= 1
             else:
                 player_index *= -1
 
-    def play_turn(self, player_index, print_actions):
+    def play_turn(self, player_index, explore, print_actions):
         player = self.players[player_index]
-        action = player.generate_action(verbose=print_actions)
+        action = player.generate_action(explore=explore, verbose=print_actions)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION")
-            action = player.generate_action(verbose=print_actions)
+            action = player.generate_action(explore=explore, verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
         for unique_player in self.unique_players:
             unique_player.update_session(state, reward, reset)

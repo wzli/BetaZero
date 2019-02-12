@@ -138,7 +138,7 @@ class Agent:
             np.vstack(input_arrays), batch_size=len(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, state=None, verbose=False):
+    def generate_action(self, state=None, explore=True, verbose=False):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
         predictions = self.generate_predictions(
@@ -150,7 +150,7 @@ class Agent:
         # if explore, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
         # othersize, don't sample, just take the expected value
-        if self.save_interval > 0:
+        if explore:
             value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
             value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
@@ -171,7 +171,7 @@ class Agent:
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
                 print('ACT:', action_choice, '\tRWD:', action_reward, ""
-                      if self.save_interval == 0 else
+                      if not explore else
                       '\t\tSMP ' + str(round(value_sample, 3)), '\tEXP',
                       expected, '\tSTD:', deviation)
             print(self.name, "played", action)

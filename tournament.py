@@ -25,6 +25,7 @@ class Tournament:
             self.game,
             participant1.agent,
             participant2.agent,
+            explorer=True
             print_actions=False,
             matches=self.matches)
         print("")
