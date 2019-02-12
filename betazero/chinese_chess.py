@@ -413,7 +413,7 @@ class Session:
                                                                   location)
                 or (self.stalemate_count > 2
                     and action == get_banned_move(self.action_history))):
-            return State(self.board, self.player, self.action_history[-3:],
+            return State(self.board, self.player, self.action_history[-4:],
                          len(self.action_history),
                          self.stalemate_count), -max_value, 1
         board, reward = move_piece(self.board, location, move)
@@ -429,7 +429,7 @@ class Session:
         else:
             self.board = board
             reset = 0
-        return State(board, -self.player, self.action_history[-3:],
+        return State(board, -self.player, self.action_history[-4:],
                      len(self.action_history),
                      self.stalemate_count), reward, reset
 
