@@ -196,13 +196,14 @@ def is_valid_move(board, player, move):
     return True
 
 
-def get_banned_move(move_history):
-    if len(move_history) < 3:
+def get_banned_move(action_history):
+    if len(action_history) < 4:
         return None
-    opponent_location, opponent_move = move_history[-1]
-    if (opponent_move, opponent_location) == move_history[-3]:
-        move, location = move_history[-2]
-        return (location, move)
+    opponent_location, opponent_move = action_history[-1]
+    if (opponent_move, opponent_location) == action_history[-3]:
+        previous_location, previous_move = action_history[-2]
+        if(action_history[-4][1] == previous_location):
+            return (previous_move, previous_location)
 
 
 def move_piece(board, location, move):
@@ -396,7 +397,7 @@ class Session:
     def reset(self):
         self.player = 1
         self.board = np.zeros(board_size, dtype=np.int8)
-        self.move_history = []
+        self.action_history = []
         self.stalemate_count = 0
         for piece, location in red_spawn:
             self.board[location] = piece
@@ -408,27 +409,26 @@ class Session:
         location, move = action
         if (not is_within_bounds(location)
                 or get_player(self.board[location]) != self.player
-                or move not in moves_lookup[self.board[location]](self.board,
-                                                                  location)
-                or action == get_banned_move(self.move_history)):
-            return State(self.board, self.player, self.move_history[-3:],
-                         len(self.move_history),
+                or move not in moves_lookup[self.board[location]](self.board, location)
+                or (self.stalemate_count < 4 and action == get_banned_move(self.action_history))):
+            return State(self.board, self.player, self.action_history[-3:],
+                         len(self.action_history),
                          self.stalemate_count), -max_value, 1
         board, reward = move_piece(self.board, location, move)
-        self.move_history.append(action)
+        self.action_history.append(action)
         self.player *= -1
         if reward == 0:
             self.stalemate_count += 1
         else:
             self.stalemate_count = 0
         if reward >= max_value or self.stalemate_count >= max_stalemate_count:
-            reset = len(self.move_history)
+            reset = len(self.action_history)
             self.reset()
         else:
             self.board = board
             reset = 0
-        return State(board, -self.player, self.move_history[-3:],
-                     len(self.move_history),
+        return State(board, -self.player, self.action_history[-3:],
+                     len(self.action_history),
                      self.stalemate_count), reward, reset
 
 
@@ -439,17 +439,17 @@ class State:
     def __init__(self,
                  board,
                  player,
-                 move_history=[],
+                 action_history=[],
                  n_turns=0,
                  stalemate_count=0):
         self.board = board
         self.player = player
-        self.move_history = move_history
+        self.action_history = action_history
         self.n_turns = n_turns
         self.stalemate_count = stalemate_count
 
     def flip(self):
-        return State(self.board, -self.player, self.move_history, self.n_turns,
+        return State(self.board, -self.player, self.action_history, self.n_turns,
                      self.stalemate_count)
 
     def array(self):
@@ -478,7 +478,7 @@ class State:
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    banned_move = get_banned_move(state.move_history)
+    banned_move = get_banned_move(state.action_history) if state.stalemate_count < 4 else None
     return [(location, move)
             for location, piece in np.ndenumerate(state.board)
             if get_player(piece) == state.player
@@ -491,8 +491,8 @@ def predict_action(state, action):
     stalemate_count = state.stalemate_count + 1 if reward == 0 else 0
     reset = state.n_turns + 1 if (
         reward >= max_value or stalemate_count >= max_stalemate_count) else 0
-    move_history = state.move_history[-2:].append(action)
-    return State(board, state.player, move_history, state.n_turns + 1,
+    action_history = state.action_history[-2:].append(action)
+    return State(board, state.player, action_history, state.n_turns + 1,
                  stalemate_count), reward, reset
 
 
