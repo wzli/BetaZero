@@ -47,21 +47,21 @@ def fetch_eliminated_models(record_file):
     return set()
 
 
-def fetch_remote_models(url):
-    html_response = urlopen(url)
+def fetch_remote_models(url, timeout):
+    html_response = urlopen(url, timeout=timeout)
     html = str(html_response.read())
     parser = LinkParser()
     parser.feed(html)
     return filter_model_names(parser.links)
 
 
-def download_models(url, directory, models):
+def download_models(url, directory, models, timeout):
     for model in models:
         model_file = "model_" + str(model) + ".h5"
         file_url = os.path.join(url, model_file)
         try:
             print("downloading", file_url)
-            response = urlopen(file_url, timeout=5)
+            response = urlopen(file_url, timeout=timeout)
             with open(os.path.join(directory, model_file), 'wb') as f:
                 f.write(response.read())
             break
@@ -76,6 +76,12 @@ if __name__ == '__main__':
         'remote_url',
         help='url to remote directory containing models_[ts].h5 files')
     parser.add_argument(
+        '-t',
+        '--timeout',
+        type=int,
+        default=5,
+        help="http request timeout in seconds")
+    parser.add_argument(
         '-d',
         "--model-directory",
         default='.',
@@ -85,11 +91,11 @@ if __name__ == '__main__':
 
     eliminated_models = fetch_eliminated_models(args.record_file)
     local_models = fetch_local_models(args.model_directory)
-    remote_models = fetch_remote_models(args.remote_url)
+    remote_models = fetch_remote_models(args.remote_url, args.timeout)
     new_models = remote_models - local_models - eliminated_models
     print("eliminated models:", eliminated_models)
     print("local models:", local_models)
     print("remote models:", remote_models)
     print("new models:", new_models)
 
-    download_models(args.remote_url, args.model_directory, new_models)
+    download_models(args.remote_url, args.model_directory, new_models, args.timeout)
