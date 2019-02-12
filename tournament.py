@@ -93,14 +93,16 @@ class TournamentParticipant:
         self.agent = None
 
     def create_agent(self):
-        self.agent = ai.Agent(
-            self.tournament.game, str(self.agent_id),
-            os.path.join(self.model_directory,
-                         "model_" + str(self.agent_id) + ".h5"))
+        self.agent = ai.Agent(self.tournament.game,
+                              str(self.id),
+                              os.path.join(self.model_directory,
+                                           "model_" + str(self.id) + ".h5"))
 
     def __lt__(self, opponent):
         if not self.agent:
             self.create_agent()
+        if not opponent.agent:
+            opponent.create_agent()
         winner, loser = tournament.playoff(self, opponent)
         # it's a min heap, less is good
         return winner.id == self.id
