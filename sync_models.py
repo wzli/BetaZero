@@ -43,7 +43,7 @@ def fetch_eliminated_models(record_file):
         # load record from yaml file
         record = yaml.load(record_yaml)
         if "eliminated" in record:
-            return set(record["eliminated"])
+            return set(record["eliminated"].keys())
     return set()
 
 
@@ -98,4 +98,5 @@ if __name__ == '__main__':
     print("remote models:", remote_models)
     print("new models:", new_models)
 
-    download_models(args.remote_url, args.model_directory, new_models, args.timeout)
+    download_models(args.remote_url, args.model_directory, new_models,
+                    args.timeout)
