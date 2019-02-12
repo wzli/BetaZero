@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse, os, yaml
-from heapq import heapify, heapreplace
+from heapq import heapify, heappush, heappop
 from betazero import ai, utils
 
 
@@ -21,11 +21,18 @@ class Tournament:
         self.elo_stats = {}
         self.participants = []
 
-    def add_participants(self, model_directory, models):
-        # initialize participants
+    def add_participants(self, model_directory, models, ranking_matches=True):
+        # iterate models
         for model in models:
             try:
-                TournamentParticipant(self, model_directory, model)
+                # initialize participants
+                participant = TournamentParticipant(self, model_directory,
+                                                    model)
+                # decide whether to play initial ranking matches
+                if ranking_matches:
+                    heappush(self.participants, participant)
+                else:
+                    self.participants.append(participant)
             except Exception as e:
                 print(e)
 
@@ -63,9 +70,11 @@ class Tournament:
 
     def run_once(self, matches):
         self.matches = matches
-        # de-throne the champion
-        heapreplace(self.participants, self.participants[0])
-        # itterate tornament
+        # de-throne the champion, helps balance the heap
+        champion = heappop(self.participants)
+        # verify the champion's ability to climb back to the top
+        heappush(self.participants, champion)
+        # playoff every section of the tournament
         heapify(self.participants)
 
     def eliminate(self, n_remaining):
@@ -80,13 +89,18 @@ class TournamentParticipant:
     def __init__(self, tournament, model_directory, agent_id):
         self.tournament = tournament
         self.id = agent_id
-        self.agent = ai.Agent(tournament.game,
-                              str(agent_id),
-                              os.path.join(model_directory,
-                                           "model_" + str(agent_id) + ".h5"))
-        tournament.participants.append(self)
+        self.model_directory = model_directory
+        self.agent = None
+
+    def create_agent(self):
+        self.agent = ai.Agent(
+            self.tournament.game, str(self.agent_id),
+            os.path.join(self.model_directory,
+                         "model_" + str(self.agent_id) + ".h5"))
 
     def __lt__(self, opponent):
+        if not self.agent:
+            self.create_agent()
         winner, loser = tournament.playoff(self, opponent)
         # it's a min heap, less is good
         return winner.id == self.id
@@ -147,7 +161,7 @@ if __name__ == '__main__':
         # find models matching names "model_[ts].h5"
         models = scan_models(args.model_directory) - eliminated_models
         # initialize participants
-        tournament.add_participants(args.model_directory, models)
+        tournament.add_participants(args.model_directory, models, False)
         while True:
             # print current record
             print("Rankings:")
