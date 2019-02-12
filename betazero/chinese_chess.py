@@ -202,7 +202,7 @@ def get_banned_move(action_history):
     opponent_location, opponent_move = action_history[-1]
     if (opponent_move, opponent_location) == action_history[-3]:
         previous_location, previous_move = action_history[-2]
-        if(action_history[-4][1] == previous_location):
+        if (action_history[-4][1] == previous_location):
             return (previous_move, previous_location)
 
 
@@ -409,8 +409,10 @@ class Session:
         location, move = action
         if (not is_within_bounds(location)
                 or get_player(self.board[location]) != self.player
-                or move not in moves_lookup[self.board[location]](self.board, location)
-                or (self.stalemate_count < 4 and action == get_banned_move(self.action_history))):
+                or move not in moves_lookup[self.board[location]](self.board,
+                                                                  location)
+                or (self.stalemate_count > 2
+                    and action == get_banned_move(self.action_history))):
             return State(self.board, self.player, self.action_history[-3:],
                          len(self.action_history),
                          self.stalemate_count), -max_value, 1
@@ -449,8 +451,8 @@ class State:
         self.stalemate_count = stalemate_count
 
     def flip(self):
-        return State(self.board, -self.player, self.action_history, self.n_turns,
-                     self.stalemate_count)
+        return State(self.board, -self.player, self.action_history,
+                     self.n_turns, self.stalemate_count)
 
     def array(self):
         board_array = np.zeros((8, *board_size), dtype=np.int8)
@@ -478,7 +480,8 @@ class State:
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    banned_move = get_banned_move(state.action_history) if state.stalemate_count < 4 else None
+    banned_move = get_banned_move(
+        state.action_history) if state.stalemate_count > 2 else None
     return [(location, move)
             for location, piece in np.ndenumerate(state.board)
             if get_player(piece) == state.player
