@@ -18,14 +18,31 @@ def scan_models(directory):
 class Tournament:
     def __init__(self, game):
         self.game = game
+        self.elo_stats = {}
         self.participants = []
+
+    def add_participants(self, model_directory, models):
+        # initialize participants
+        for model in models:
+            try:
+                TournamentParticipant(self, model_directory, model)
+            except Exception as e:
+                print(e)
+
+    def adjust_elo(self, winner, loser, k=30):
+        rating_gap = (self.elo_stats.setdefault(winner.id, 0) -
+                      self.elo_stats.setdefault(loser.id, 0)) / 400
+        p_winner = 1.0 / (1.0 + 10**-rating_gap)
+        p_loser = 1.0 - p_winner
+        self.elo_stats[winner.id] += k * (1 - p_winner)
+        self.elo_stats[loser.id] -= k * p_loser
 
     def playoff(self, participant1, participant2):
         arena = utils.Arena(
             self.game,
             participant1.agent,
             participant2.agent,
-            explorer=True
+            explore=True,
             print_actions=False,
             matches=self.matches)
         print("")
@@ -41,6 +58,7 @@ class Tournament:
         else:
             winner = participant2
             loser = participant1
+        self.adjust_elo(winner, loser)
         return winner, loser
 
     def run_once(self, matches):
@@ -62,7 +80,8 @@ class TournamentParticipant:
     def __init__(self, tournament, model_directory, agent_id):
         self.tournament = tournament
         self.id = agent_id
-        self.agent = ai.Agent(tournament.game, str(agent_id),
+        self.agent = ai.Agent(tournament.game,
+                              str(agent_id),
                               os.path.join(model_directory,
                                            "model_" + str(agent_id) + ".h5"))
         tournament.participants.append(self)
@@ -118,42 +137,44 @@ if __name__ == '__main__':
         # load record from yaml file
         record = yaml.load(record_yaml) or {
             "participants": [],
-            "eliminated": set()
+            "eliminated": [],
+            "elo_stats": {}
         }
+        # load previously saved elo stats
+        tournament.elo_stats = record["elo_stats"]
+        # load prevously eliminated models
+        eliminated_models = set(record["eliminated"])
         # find models matching names "model_[ts].h5"
-        models = scan_models(args.model_directory)
+        models = scan_models(args.model_directory) - eliminated_models
         # initialize participants
-        for model in models - record["eliminated"]:
-            try:
-                TournamentParticipant(tournament, args.model_directory, model)
-            except Exception as e:
-                print(e)
+        tournament.add_participants(args.model_directory, models)
         while True:
             # print current record
             print("Rankings:")
             for rank, participant in enumerate(record["participants"]):
-                print(rank, "\t", participant)
-            for participant in record["eliminated"]:
-                print("e\t", participant)
+                print("rank", rank, "\tid", participant, "\telo",
+                      record["elo_stats"][participant])
             print("")
             # scan for new participants to add to the tournament
-            scanned_models = scan_models(
-                args.model_directory) - record["eliminated"]
-            for model in scanned_models - models:
-                try:
-                    TournamentParticipant(tournament, args.model_directory,
-                                          model)
-                except Exception as e:
-                    print(e)
-            models = scanned_models
+            current_models = scan_models(
+                args.model_directory) - eliminated_models
+            # add newly scanned models to the tournament
+            tournament.add_participants(args.model_directory,
+                                        current_models - models)
+            models = current_models
+            # run the tournament
             tournament.run_once(args.matches)
+            # eliminate losers
             eliminated_participants = tournament.eliminate(args.n_participants)
+            # parse remaining participants to record
             record["participants"] = [
                 participant.id for participant in tournament.participants
             ]
-            record["eliminated"].update(
+            # parse eliminated participants to record
+            eliminated_models.update(
                 {participant.id
                  for participant in eliminated_participants})
+            record["eliminated"] = list(eliminated_models)
             # record the record
             record_yaml.seek(0)
             record_yaml.truncate()
