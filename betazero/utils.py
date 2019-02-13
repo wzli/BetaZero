@@ -133,7 +133,7 @@ class Arena:
         action = player.generate_action(explore=explore, verbose=print_actions)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
-            print(player.name, ": INVALID ACTION")
+            print(player.name, ": INVALID ACTION", action)
             action = player.generate_action(explore=explore, verbose=print_actions)
             state, reward, reset = self.session.do_action(action)
         for unique_player in self.unique_players:

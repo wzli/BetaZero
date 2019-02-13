@@ -304,13 +304,13 @@ def king_moves(board, location):
                           (row - 1, col))
         if is_valid_move(board, player, move) and is_in_palace(player, move)
     ]
-    col += player
+    row += player
     while is_within_bounds((row, col)):
         if board[row, col] != EMPTY:
             if enemy(board[(row, col)]) == board[location]:
                 moves.append((row, col))
             break
-        col += player
+        row += player
     return moves
 
 
@@ -407,7 +407,7 @@ class Session:
 
     def do_action(self, action):
         location, move = action
-        if (not is_within_bounds(location)
+        if (not location or not move or not is_within_bounds(location)
                 or get_player(self.board[location]) != self.player
                 or move not in moves_lookup[self.board[location]](self.board,
                                                                   location)
