@@ -68,11 +68,6 @@ def download_models(url, directory, models, timeout):
         except URLError as e:
             print(e)
 
-def print_models(name, models):
-    print(name)
-    for model in sorted(models):
-        print(model)
-    print("")
 
 if __name__ == '__main__':
     # create command line arguments
@@ -98,9 +93,9 @@ if __name__ == '__main__':
     local_models = fetch_local_models(args.model_directory)
     remote_models = fetch_remote_models(args.remote_url, args.timeout)
     new_models = remote_models - local_models - eliminated_models
-    print_models("eliminated models:", eliminated_models)
-    print_models("local models:", local_models)
-    print_models("remote models:", remote_models)
-    print_models("new models:", new_models)
+    print("eliminated models:", sorted(eliminated_models))
+    print("local models:", sorted(local_models))
+    print("remote models:", sorted(remote_models))
+    print("new models:", sorted(new_models))
     download_models(args.remote_url, args.model_directory, new_models,
                     args.timeout)
