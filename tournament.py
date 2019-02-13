@@ -16,6 +16,19 @@ def scan_models(directory):
     return models
 
 
+def access_yaml(yaml_file, new_content=None):
+    file_mode = 'r+' if os.path.exists(yaml_file) else 'w+'
+    with open(yaml_file, file_mode) as record_yaml:
+        # load record from yaml file
+        content = yaml.load(record_yaml)
+        # overwrite the record if new content
+        if new_content:
+            record_yaml.seek(0)
+            record_yaml.truncate()
+            yaml.dump(new_content, record_yaml, default_flow_style=False)
+        return content
+
+
 class Tournament:
     def __init__(self, game):
         self.game = game
@@ -149,56 +162,49 @@ if __name__ == '__main__':
     # create the tournament
     tournament = Tournament(game)
     # read/create record yaml file
-    file_mode = 'r+' if os.path.exists(args.record_file) else 'w+'
-    with open(args.record_file, file_mode) as record_yaml:
-        # load record from yaml file
-        record = yaml.load(record_yaml) or {
-            "eliminated": {},
-            "participants": [],
-        }
-        # find models matching names "model_[ts].h5"
-        models = scan_models(
+    record = access_yaml(args.record_file) or {
+        "eliminated": {},
+        "participants": []
+    }
+    # find models matching names "model_[ts].h5"
+    models = scan_models(args.model_directory) - record["eliminated"].keys()
+    new_models = models - set(participant_record["id"]
+                              for participant_record in record["participants"])
+    # initialize participants
+    model_entries = [(participant_record["id"], participant_record["elo"])
+                     for participant_record in record["participants"]
+                     if participant_record["id"] in models
+                     ] + [(new_model, 0) for new_model in new_models]
+    tournament.add_participants(args.model_directory, model_entries)
+    while True:
+        # print current record
+        print("Rankings:")
+        for rank, participant in enumerate(tournament.participants):
+            print("rank", rank, "\tid", participant.id, "\telo",
+                  participant.elo)
+        print("")
+        # scan for new participants to add to the tournament
+        current_models = scan_models(
             args.model_directory) - record["eliminated"].keys()
-        new_models = models - set(
-            participant_record["id"]
-            for participant_record in record["participants"])
-        # initialize participants
-        model_entries = [(participant_record["id"], participant_record["elo"])
-                         for participant_record in record["participants"]
-                         if participant_record["id"] in models
-                         ] + [(new_model, 0) for new_model in new_models]
+        # add newly scanned models to the tournament
+        model_entries = [(model, 0) for model in current_models - models]
         tournament.add_participants(args.model_directory, model_entries)
-        while True:
-            # print current record
-            print("Rankings:")
-            for rank, participant in enumerate(tournament.participants):
-                print("rank", rank, "\tid", participant.id, "\telo",
-                      participant.elo)
-            print("")
-            # scan for new participants to add to the tournament
-            current_models = scan_models(
-                args.model_directory) - record["eliminated"].keys()
-            # add newly scanned models to the tournament
-            model_entries = [(model, 0) for model in current_models - models]
-            tournament.add_participants(args.model_directory, model_entries)
-            models = current_models
-            # run the tournament
-            tournament.run_once(args.matches)
-            # eliminate losers
-            eliminated_participants = tournament.eliminate(args.n_participants)
-            # refresh record
-            record = yaml.load(record_yaml)
-            # parse remaining participants to record
-            record["participants"] = [{
-                "id": participant.id,
-                "elo": participant.elo
-            } for participant in tournament.participants]
-            # parse eliminated participants to record
-            record["eliminated"].update({
-                participant.id: participant.elo
-                for participant in eliminated_participants
-            })
-            # record the record
-            record_yaml.seek(0)
-            record_yaml.truncate()
-            yaml.dump(record, record_yaml, default_flow_style=False)
+        models = current_models
+        # run the tournament
+        tournament.run_once(args.matches)
+        # eliminate losers
+        eliminated_participants = tournament.eliminate(args.n_participants)
+        # refresh record
+        record = access_yaml(args.record_file) or {"eliminated": {}}
+        # parse remaining participants to record
+        record["participants"] = [{
+            "id": participant.id,
+            "elo": participant.elo
+        } for participant in tournament.participants]
+        # parse eliminated participants to record
+        record["eliminated"].update({
+            participant.id: participant.elo
+            for participant in eliminated_participants
+        })
+        # write new record
+        access_yaml(args.record_file, record)
