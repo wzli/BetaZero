@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse, os, yaml
-from heapq import heapify, heappop
+from heapq import heapify
 from random import shuffle
 from betazero import ai, utils
 
@@ -27,6 +27,14 @@ def access_yaml(yaml_file, new_content=None):
             record_yaml.truncate()
             yaml.dump(new_content, record_yaml, default_flow_style=False)
         return content
+
+
+def adjust_elo(winner, loser, k=30):
+    rating_gap = (winner.elo - loser.elo) / 400
+    p_winner = 1.0 / (1.0 + 10**-rating_gap)
+    p_loser = 1.0 - p_winner
+    winner.elo += k * (1 - p_winner)
+    loser.elo -= k * p_loser
 
 
 class Tournament:
@@ -66,35 +74,30 @@ class Tournament:
         else:
             winner = participant2
             loser = participant1
+        adjust_elo(winner, loser)
         return winner, loser
 
     def run_once(self, matches):
         self.matches = matches
-        # de-throne the champion to verify ability to climb back up
-        champion = heappop(self.participants)
-        self.participants.append(champion)
-        # shuffle bottom layer of participants
-        mid_index = len(self.participants) // 2
-        bottom_layer = self.participants[mid_index:]
-        shuffle(bottom_layer)
-        self.participants = self.participants[:mid_index] + bottom_layer
-        # playoff every section of the tournament
+        # face-off similar ranking participants (assuming participants are ordered by elo)
         heapify(self.participants)
+        # face-off participants randomly
+        shuffle(self.participants)
+        heapify(self.participants)
+        # sort participants in order of elo
+        self.participants.sort(key=lambda x: x.elo, reverse=True)
 
     def eliminate(self, n_remaining):
         if n_remaining >= len(self.participants):
             return []
         eliminated = self.participants[n_remaining:]
         self.participants = self.participants[:n_remaining]
+        # normalize elo
+        average_elo = sum(participant.elo
+                          for participant in self.participants) / n_remaining
+        for participant in self.participants:
+            participant.elo -= average_elo
         return eliminated
-
-
-def adjust_elo(winner, loser, k=30):
-    rating_gap = (winner.elo - loser.elo) / 400
-    p_winner = 1.0 / (1.0 + 10**-rating_gap)
-    p_loser = 1.0 - p_winner
-    winner.elo += k * (1 - p_winner)
-    loser.elo -= k * p_loser
 
 
 class TournamentParticipant:
@@ -117,7 +120,6 @@ class TournamentParticipant:
         if not opponent.agent:
             opponent.create_agent()
         winner, loser = tournament.playoff(self, opponent)
-        adjust_elo(winner, loser)
         # it's a min heap, less is good
         return winner.id == self.id
 
@@ -170,7 +172,7 @@ if __name__ == '__main__':
     models = scan_models(args.model_directory) - record["eliminated"].keys()
     new_models = models - set(participant_record["id"]
                               for participant_record in record["participants"])
-    # initialize participants
+    #initialize participants
     model_entries = [(participant_record["id"], participant_record["elo"])
                      for participant_record in record["participants"]
                      if participant_record["id"] in models
