@@ -58,6 +58,10 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
+        # continue below only if training is required
+        if self.save_interval <= 0:
+            return
+
         # setup tensorboard callback
         from keras.callbacks import TensorBoard
         self.training_callbacks = [
