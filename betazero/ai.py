@@ -97,8 +97,8 @@ class Agent:
             try:
                 self.training_queue.put(training_set, timeout=5)
                 break
-            except queue.Queue.Full as e:
-                print(self.total_moves, e)
+            except queue.Full:
+                print("Queue Full at ", self.total_moves)
 
     def save_model(self, training_set, original_training_set):
         # create save directory if doesn't exist
