@@ -58,7 +58,7 @@ class Tournament:
             self.game,
             participant1.agent,
             participant2.agent,
-            explore=True,
+            explore=False,
             print_actions=False,
             matches=self.matches)
         print("")
@@ -93,8 +93,8 @@ class Tournament:
         eliminated = self.participants[n_remaining:]
         self.participants = self.participants[:n_remaining]
         # normalize elo
-        average_elo = sum(participant.elo
-                          for participant in self.participants) / n_remaining
+        average_elo = sum(
+            participant.elo for participant in self.participants) / n_remaining
         for participant in self.participants:
             participant.elo -= average_elo
         return eliminated
@@ -109,8 +109,7 @@ class TournamentParticipant:
         self.agent = None
 
     def create_agent(self):
-        self.agent = ai.Agent(self.tournament.game,
-                              str(self.id),
+        self.agent = ai.Agent(self.tournament.game, str(self.id),
                               os.path.join(self.model_directory,
                                            "model_" + str(self.id) + ".h5"))
 

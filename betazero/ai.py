@@ -85,11 +85,20 @@ class Agent:
         # main loop for training thread
         while True:
             training_set, original_training_set = self.training_queue.get()
-            self.value_model.fit(*training_set, verbose=0)
+            self.value_model.fit(
+                *training_set, batch_size=len(training_set[0]), verbose=0)
             n_moves = len(original_training_set[0])
             self.total_moves += n_moves
             self.save_counter += n_moves
             self.training_queue.task_done()
+
+    def queue_training_set(self, training_set):
+        while True:
+            try:
+                self.training_queue.put(training_set, timeout=5)
+                break
+            except queue.Queue.Full as e:
+                print(self.total_moves, e)
 
     def save_model(self, training_set, original_training_set):
         # create save directory if doesn't exist
@@ -102,6 +111,7 @@ class Agent:
         # use keras tensorboard callback for logging
         self.value_model.fit(
             *training_set,
+            batch_size=len(training_set[0]),
             verbose=0,
             validation_split=0.99,
             callbacks=self.training_callbacks)
@@ -257,7 +267,7 @@ class Agent:
                     reset_count, self.game.terminal_state)
                 # save model if counter is reached
                 if self.save_counter < self.save_interval:
-                    self.training_queue.put(training_set)
+                    self.queue_training_set(training_set)
                 else:
                     self.save_model(*training_set)
             # discard history of the previous game after it's been trained
@@ -274,7 +284,7 @@ class Agent:
             # reward received, train the network
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)
-            self.training_queue.put(training_set)
+            self.queue_training_set(training_set)
         elif not self.action_prediction_history[-1]:
             raise ValueError(
                 self.name + ": no more actions but game doesn't reset")
