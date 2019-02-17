@@ -1,6 +1,29 @@
 import numpy as np
 from math import floor
 
+import signal
+from contextlib import contextmanager
+
+
+@contextmanager
+def timeout(time):
+    # Register a function to raise a TimeoutError on the signal.
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after ``time``.
+    signal.alarm(time)
+    try:
+        yield
+    except TimeoutError:
+        pass
+    finally:
+        # Unregister the signal so it won't be triggered
+        # if the timeout is not reached.
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
+
+def raise_timeout(signum, frame):
+    raise TimeoutError
+
 
 def clip(value, upper, lower=0):
     return max(lower, min(upper, value))
@@ -69,9 +92,9 @@ def symetric_arrays(array, rotational_symetry, vertical_symetry,
 def ascii_board(board):
     ascii_board = [' '.join([''] + [str(i) for i in range(board.shape[1])])]
     for i, row in enumerate(board):
-        ascii_board.append(' '.join(
-            [str(i)] +
-            ['·' if cell == 0 else '○' if cell > 0 else '●' for cell in row]))
+        ascii_board.append(' '.join([str(i)] + [
+            '·' if cell == 0 else '○' if cell > 0 else '●' for cell in row
+        ]))
     return '\n'.join(ascii_board)
 
 
@@ -106,11 +129,7 @@ class Arena:
                  matches=-1):
         self.game = game
         self.session = self.game.Session()
-        self.players = (
-            None,
-            player1,
-            player2,
-        )
+        self.players = (None, player1, player2, )
         self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0
@@ -121,12 +140,13 @@ class Arena:
             unique_player.update_session(*updates)
         player_index = self.first_turn
         while self.matches != 0:
-            if self.play_turn(player_index, explore, print_actions):
-                self.first_turn *= -1
-                player_index = self.first_turn
-                self.matches -= 1
-            else:
-                player_index *= -1
+            with timeout(10):
+                if self.play_turn(player_index, explore, print_actions):
+                    self.first_turn *= -1
+                    player_index = self.first_turn
+                    self.matches -= 1
+                else:
+                    player_index *= -1
 
     def play_turn(self, player_index, explore, print_actions):
         player = self.players[player_index]
