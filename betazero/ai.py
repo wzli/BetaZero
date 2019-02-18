@@ -90,8 +90,7 @@ class Agent:
         # main loop for training thread
         while True:
             training_set, original_training_set = self.training_queue.get()
-            self.value_model.fit(
-                *training_set, batch_size=len(training_set[0]), verbose=0)
+            self.value_model.fit(*training_set, verbose=0)
             n_moves = len(original_training_set[0])
             self.total_moves += n_moves
             self.save_counter += n_moves
@@ -116,7 +115,6 @@ class Agent:
         # use keras tensorboard callback for logging
         self.value_model.fit(
             *training_set,
-            batch_size=len(training_set[0]),
             verbose=0,
             validation_split=0.99,
             callbacks=self.training_callbacks)
