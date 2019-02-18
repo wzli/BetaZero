@@ -106,22 +106,27 @@ class TournamentParticipant:
         self.agent = None
 
     def create_agent(self):
+        model_path = os.path.join(self.model_directory,
+                                  "model_" + str(self.id) + ".h5")
+        if not os.path.isfile(model_path):
+            print("path doesn't exist", model_path)
+            return False
         try:
             with utils.timeout(60):
-                self.agent = ai.Agent(
-                    self.tournament.game,
-                    str(self.id),
-                    os.path.join(self.model_directory,
-                                 "model_" + str(self.id) + ".h5"))
+                self.agent = ai.Agent(self.tournament.game,
+                                      str(self.id), model_path)
+                return True
         except Exception as e:
             print("create agent exception")
             print(e)
+        return False
 
     def __lt__(self, opponent):
-        if not self.agent:
-            self.create_agent()
-        if not opponent.agent:
-            opponent.create_agent()
+        # create model if not already, default lose if exeption occurs
+        if not self.agent and not self.create_agent():
+            return False
+        if not opponent.agent and not opponent.create_agent():
+            return True
         winner, loser = tournament.playoff(self, opponent)
         # it's a min heap, less is good
         return winner.id == self.id
