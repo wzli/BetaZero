@@ -51,26 +51,36 @@ class Tournament:
             self.participants.append(participant)
 
     def playoff(self, participant1, participant2):
-        arena = utils.Arena(
-            self.game,
-            participant1.agent,
-            participant2.agent,
-            explore=False,
-            print_actions=False,
-            matches=self.matches)
-        print("")
-        if arena.stats[1] > arena.stats[-1]:
-            winner = participant1
-            loser = participant2
-        elif arena.stats[1] < arena.stats[-1]:
-            winner = participant2
-            loser = participant1
-        elif arena.score > 0:
-            winner = participant1
-            loser = participant2
-        else:
-            winner = participant2
-            loser = participant1
+        try:
+            arena = utils.Arena(
+                self.game,
+                participant1.agent,
+                participant2.agent,
+                explore=False,
+                print_actions=False,
+                matches=self.matches)
+            print("")
+            if arena.stats[1] > arena.stats[-1]:
+                winner = participant1
+                loser = participant2
+            elif arena.stats[1] < arena.stats[-1]:
+                winner = participant2
+                loser = participant1
+            elif arena.score > 0:
+                winner = participant1
+                loser = participant2
+            else:
+                winner = participant2
+                loser = participant1
+        except Exception as e:
+            print(e)
+            print("exception during turn ", arena.player_index)
+            if arena.player_index > 0:
+                winner = participant2
+                loser = participant1
+            else:
+                winner = participant1
+                loser = participant2
         adjust_elo(winner, loser)
         return winner, loser
 
@@ -108,17 +118,14 @@ class TournamentParticipant:
     def create_agent(self):
         model_path = os.path.join(self.model_directory,
                                   "model_" + str(self.id) + ".h5")
-        if not os.path.isfile(model_path):
-            print("path doesn't exist", model_path)
-            return False
         try:
             with utils.timeout(60):
                 self.agent = ai.Agent(self.tournament.game,
                                       str(self.id), model_path)
                 return True
         except Exception as e:
-            print("create agent exception")
             print(e)
+            print("create agent exception")
         return False
 
     def __lt__(self, opponent):

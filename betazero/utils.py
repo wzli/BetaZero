@@ -138,15 +138,15 @@ class Arena:
         updates = self.session.reset()
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
-        player_index = self.first_turn
+        self.player_index = self.first_turn
         while self.matches != 0:
             with timeout(10):
-                if self.play_turn(player_index, explore, print_actions):
+                if self.play_turn(self.player_index, explore, print_actions):
                     self.first_turn *= -1
-                    player_index = self.first_turn
+                    self.player_index = self.first_turn
                     self.matches -= 1
                 else:
-                    player_index *= -1
+                    self.player_index *= -1
 
     def play_turn(self, player_index, explore, print_actions):
         player = self.players[player_index]

@@ -339,8 +339,8 @@ class Session:
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, -self.perspective, np.zeros(board_size),
-                           np.zeros(board_size))
+        self.state = State(self, -self.perspective,
+                           np.zeros(board_size), np.zeros(board_size))
         return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
@@ -445,8 +445,9 @@ def get_actions(state, include_pass=True):
     # take all empty spots minus the suicidal ones
     # can't take back a ko
     actions = [
-        spot for spot in session.empty_spots if
-        not session.is_suicide(spot, state.perspective) and spot != session.ko
+        spot for spot in session.empty_spots
+        if not session.is_suicide(spot, state.perspective)
+        and spot != session.ko
     ]
     # action None is to pass
     if include_pass or not actions:
