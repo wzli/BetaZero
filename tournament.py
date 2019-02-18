@@ -119,7 +119,7 @@ class TournamentParticipant:
         model_path = os.path.join(self.model_directory,
                                   "model_" + str(self.id) + ".h5")
         try:
-            with utils.timeout(60):
+            with utils.timeout(180):
                 self.agent = ai.Agent(self.tournament.game, str(self.id),
                                       model_path)
                 return True
