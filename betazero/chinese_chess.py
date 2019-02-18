@@ -266,12 +266,10 @@ def knight_moves(board, location):
         if (is_within_bounds((row + d_row, col + d_col))
                 and board[row + d_row, col + d_col] == EMPTY):
             moves.extend([
-                move
-                for move in ((row + 2 * d_row + d_col,
-                              col + 2 * d_col + d_row),
-                             (row + 2 * d_row - d_col,
-                              col + 2 * d_col - d_row), )
-                if is_valid_move(board, player, move)
+                move for move in (
+                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
+                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
+                ) if is_valid_move(board, player, move)
             ])
     return moves
 
@@ -280,12 +278,11 @@ def elephant_moves(board, location):
     row, col = location
     player = get_player(board[location])
     return [
-        move
-        for move in ((row + 2, col + 2), (row + 2, col - 2),
-                     (row - 2, col + 2), (row - 2, col - 2))
+        move for move in ((row + 2, col + 2), (row + 2, col - 2),
+                          (row - 2, col + 2), (row - 2, col - 2))
         if is_valid_move(board, player, move)
-        and not is_across_river(player, move)
-        and board[(move[0] + row) // 2, (move[1] + col) // 2] == EMPTY
+        and not is_across_river(player, move) and board[(move[0] + row) // 2, (
+            move[1] + col) // 2] == EMPTY
     ]
 
 
@@ -293,9 +290,8 @@ def guard_moves(board, location):
     row, col = location
     player = get_player(board[location])
     return [
-        move
-        for move in ((row + 1, col + 1), (row + 1, col - 1),
-                     (row - 1, col + 1), (row - 1, col - 1))
+        move for move in ((row + 1, col + 1), (row + 1, col - 1),
+                          (row - 1, col + 1), (row - 1, col - 1))
         if is_valid_move(board, player, move) and is_in_palace(player, move)
     ]
 
@@ -304,9 +300,8 @@ def king_moves(board, location):
     row, col = location
     player = get_player(board[location])
     moves = [
-        move
-        for move in ((row, col + 1), (row, col - 1), (row + 1, col), (row - 1,
-                                                                      col))
+        move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
+                          (row - 1, col))
         if is_valid_move(board, player, move) and is_in_palace(player, move)
     ]
     row += player
@@ -336,13 +331,36 @@ ELEPHANT = 5
 GUARD = 6
 KING = 7
 
-moves_lookup = (None, pawn_moves, cannon_moves, rook_moves, knight_moves,
-                elephant_moves, guard_moves, king_moves, )
+moves_lookup = (
+    None,
+    pawn_moves,
+    cannon_moves,
+    rook_moves,
+    knight_moves,
+    elephant_moves,
+    guard_moves,
+    king_moves,
+)
 
 rewards_lookup = (0, 1, 2, 4, 2, 1, 1, 25)
 
-symbols_lookup = ('·', 'P', 'C', 'R', 'N', 'E', 'G', 'K', 'p', 'c', 'r', 'n',
-                  'e', 'g', 'k', )
+symbols_lookup = (
+    '·',
+    'P',
+    'C',
+    'R',
+    'N',
+    'E',
+    'G',
+    'K',
+    'p',
+    'c',
+    'r',
+    'n',
+    'e',
+    'g',
+    'k',
+)
 
 red_spawn = ((PAWN, (3, 0)), (PAWN, (3, 2)), (PAWN, (3, 4)), (PAWN, (3, 6)),
              (PAWN, (3, 8)), (CANNON, (2, 1)), (CANNON, (2, 7)), (ROOK, (0,
@@ -352,13 +370,24 @@ red_spawn = ((PAWN, (3, 0)), (PAWN, (3, 2)), (PAWN, (3, 4)), (PAWN, (3, 6)),
              (ELEPHANT, (0, 6)), (GUARD, (0, 3)), (GUARD, (0, 5)), (KING, (0,
                                                                            4)))
 
-black_spawn = ((PAWN, (6, 0)), (PAWN, (6, 2)), (PAWN, (6, 4)), (PAWN, (6, 6)),
-               (PAWN, (6, 8)), (CANNON, (7, 1)), (CANNON, (7, 7)), (ROOK, (9,
-                                                                           0)),
-               (ROOK, (9, 8)), (KNIGHT, (9, 1)), (KNIGHT, (9, 7)), (ELEPHANT,
-                                                                    (9, 2)),
-               (ELEPHANT, (9, 6)), (GUARD, (9, 3)), (GUARD,
-                                                     (9, 5)), (KING, (9, 4)), )
+black_spawn = (
+    (PAWN, (6, 0)),
+    (PAWN, (6, 2)),
+    (PAWN, (6, 4)),
+    (PAWN, (6, 6)),
+    (PAWN, (6, 8)),
+    (CANNON, (7, 1)),
+    (CANNON, (7, 7)),
+    (ROOK, (9, 0)),
+    (ROOK, (9, 8)),
+    (KNIGHT, (9, 1)),
+    (KNIGHT, (9, 7)),
+    (ELEPHANT, (9, 2)),
+    (ELEPHANT, (9, 6)),
+    (GUARD, (9, 3)),
+    (GUARD, (9, 5)),
+    (KING, (9, 4)),
+)
 
 
 class Session:

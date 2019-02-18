@@ -126,8 +126,8 @@ class Agent:
         print("time elapsed", time.time() - self.save_time, "seconds")
         self.save_time = time.time()
         self.value_model.save(
-            os.path.join(self.model_save_dir, "model_" +
-                         str(int(self.save_time)) + '.h5'))
+            os.path.join(self.model_save_dir,
+                         "model_" + str(int(self.save_time)) + '.h5'))
         self.value_model.save(self.model_path)
         for i, (x, y) in enumerate(zip(*original_training_set)):
             expected, variance = expected_value(y, self.value_range, True)
@@ -174,9 +174,9 @@ class Agent:
         else:
             value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
         value_samples = np.array([
-            reward + value_sample(value_pdf) if reset_count == 0 else reward
-            for value_pdf, reward, reset_count in zip(value_pdfs, rewards,
-                                                      reset_counts)
+            reward + value_sample(value_pdf) if reset_count == 0 else
+            reward for value_pdf, reward, reset_count in zip(
+                value_pdfs, rewards, reset_counts)
         ])
         # take the max, if max has multiple, randomly choose one
         action = actions[np.random.choice(
@@ -291,5 +291,5 @@ class Agent:
                                                       False)
             self.queue_training_set(training_set)
         elif not self.action_prediction_history[-1]:
-            raise ValueError(self.name +
-                             ": no more actions but game doesn't reset")
+            raise ValueError(
+                self.name + ": no more actions but game doesn't reset")

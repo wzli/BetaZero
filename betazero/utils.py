@@ -92,9 +92,9 @@ def symetric_arrays(array, rotational_symetry, vertical_symetry,
 def ascii_board(board):
     ascii_board = [' '.join([''] + [str(i) for i in range(board.shape[1])])]
     for i, row in enumerate(board):
-        ascii_board.append(' '.join([str(i)] + [
-            '·' if cell == 0 else '○' if cell > 0 else '●' for cell in row
-        ]))
+        ascii_board.append(' '.join(
+            [str(i)] +
+            ['·' if cell == 0 else '○' if cell > 0 else '●' for cell in row]))
     return '\n'.join(ascii_board)
 
 
@@ -129,7 +129,11 @@ class Arena:
                  matches=-1):
         self.game = game
         self.session = self.game.Session()
-        self.players = (None, player1, player2, )
+        self.players = (
+            None,
+            player1,
+            player2,
+        )
         self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0

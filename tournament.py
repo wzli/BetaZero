@@ -100,8 +100,8 @@ class Tournament:
         eliminated = self.participants[n_remaining:]
         self.participants = self.participants[:n_remaining]
         # normalize elo
-        average_elo = sum(participant.elo
-                          for participant in self.participants) / n_remaining
+        average_elo = sum(
+            participant.elo for participant in self.participants) / n_remaining
         for participant in self.participants:
             participant.elo -= average_elo
         return eliminated
@@ -120,8 +120,8 @@ class TournamentParticipant:
                                   "model_" + str(self.id) + ".h5")
         try:
             with utils.timeout(60):
-                self.agent = ai.Agent(self.tournament.game,
-                                      str(self.id), model_path)
+                self.agent = ai.Agent(self.tournament.game, str(self.id),
+                                      model_path)
                 return True
         except Exception as e:
             print(e)
