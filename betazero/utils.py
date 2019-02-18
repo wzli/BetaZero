@@ -144,7 +144,7 @@ class Arena:
             unique_player.update_session(*updates)
         self.player_index = self.first_turn
         while self.matches != 0:
-            with timeout(10):
+            with timeout(1000):
                 if self.play_turn(self.player_index, explore, print_actions):
                     self.first_turn *= -1
                     self.player_index = self.first_turn
