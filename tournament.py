@@ -45,13 +45,10 @@ class Tournament:
     def add_participants(self, model_directory, model_entries):
         # iterate models
         for model, elo in model_entries:
-            try:
-                # initialize participants
-                participant = TournamentParticipant(self, model_directory,
-                                                    model, elo)
-                self.participants.append(participant)
-            except Exception as e:
-                print(e)
+            # initialize participants
+            participant = TournamentParticipant(self, model_directory, model,
+                                                elo)
+            self.participants.append(participant)
 
     def playoff(self, participant1, participant2):
         arena = utils.Arena(
@@ -93,8 +90,8 @@ class Tournament:
         eliminated = self.participants[n_remaining:]
         self.participants = self.participants[:n_remaining]
         # normalize elo
-        average_elo = sum(
-            participant.elo for participant in self.participants) / n_remaining
+        average_elo = sum(participant.elo
+                          for participant in self.participants) / n_remaining
         for participant in self.participants:
             participant.elo -= average_elo
         return eliminated
@@ -109,9 +106,16 @@ class TournamentParticipant:
         self.agent = None
 
     def create_agent(self):
-        self.agent = ai.Agent(self.tournament.game, str(self.id),
-                              os.path.join(self.model_directory,
-                                           "model_" + str(self.id) + ".h5"))
+        try:
+            with utils.timeout(60):
+                self.agent = ai.Agent(
+                    self.tournament.game,
+                    str(self.id),
+                    os.path.join(self.model_directory,
+                                 "model_" + str(self.id) + ".h5"))
+        except Exception as e:
+            print("create agent exception")
+            print(e)
 
     def __lt__(self, opponent):
         if not self.agent:
