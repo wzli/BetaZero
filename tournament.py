@@ -80,7 +80,6 @@ class Tournament:
             else:
                 winner = participant2
                 loser = participant1
-
         adjust_elo(winner, loser)
         return winner, loser
 
@@ -124,6 +123,7 @@ class TournamentParticipant:
                                       model_path)
         except Exception as e:
             print(traceback.format_exc(), "\ncreate agent exception")
+            self.agent = None
         else:
             return True
         return False
