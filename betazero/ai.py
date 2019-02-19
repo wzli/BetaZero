@@ -38,12 +38,11 @@ class Agent:
             from keras.models import load_model
             self.value_model = load_model(model_path)
         except OSError as e:
-            print(e)
             # if not training, bubble up error
             if self.save_interval <= 0:
                 raise e
             # create blank model
-            print("Failed to load", model_path, "-> create new model")
+            print(e, "\nFailed to load", model_path, "-> create new model")
             self.value_model = game.ValueModel()
         print(self.value_model.summary())
 

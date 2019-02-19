@@ -71,10 +71,9 @@ if __name__ == '__main__':
             player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
                                args.save_directory)
     # start the game
-    utils.Arena(
-        game,
-        player1,
-        player2,
-        print_actions=not train,
+    arena = utils.Arena(game, player1, player2)
+    arena.play_matches(
+        first_turn=1 if args.first_turn else -1,
         explore=train,
-        first_turn=1 if args.first_turn else -1)
+        print_actions=not train,
+    )

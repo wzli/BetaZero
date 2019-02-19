@@ -7,17 +7,18 @@ from contextlib import contextmanager
 
 @contextmanager
 def timeout(time):
-    # Register a function to raise a TimeoutError on the signal.
+    # Register a function to raise a TimeoutError on the signal
     def raise_timeout(signum, frame):
-        raise TimeoutError
+        raise TimeoutError(str(time) + "s timeout exceeded")
+
     signal.signal(signal.SIGALRM, raise_timeout)
-    # Schedule the signal to be sent after ``time``.
+    # Schedule the signal to be sent after time
     signal.alarm(time)
     try:
+        # continue running code block
         yield
     finally:
-        # Unregister the signal so it won't be triggered
-        # if the timeout is not reached.
+        # Unregister the signal
         signal.signal(signal.SIGALRM, signal.SIG_IGN)
 
 
@@ -115,36 +116,30 @@ def parse_grid_input(board_size):
 
 
 class Arena:
-    def __init__(self,
-                 game,
-                 player1,
-                 player2,
-                 explore=False,
-                 print_actions=True,
-                 first_turn=1,
-                 matches=-1):
+    def __init__(self, game, player1, player2):
         self.game = game
         self.session = self.game.Session()
-        self.players = (
-            None,
-            player1,
-            player2,
-        )
+        self.players = (None, player1, player2)
         self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0
-        self.first_turn = first_turn
-        self.matches = matches
         updates = self.session.reset()
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
-        self.player_index = self.first_turn
-        while self.matches != 0:
-            with timeout(1000):
+
+    def play_matches(self,
+                     matches=-1,
+                     first_turn=1,
+                     print_actions=True,
+                     explore=False,
+                     turn_timeout=1000):
+        self.player_index = first_turn
+        while matches != 0:
+            with timeout(turn_timeout):
                 if self.play_turn(self.player_index, explore, print_actions):
-                    self.first_turn *= -1
-                    self.player_index = self.first_turn
-                    self.matches -= 1
+                    first_turn *= -1
+                    self.player_index = first_turn
+                    matches -= 1
                 else:
                     self.player_index *= -1
 

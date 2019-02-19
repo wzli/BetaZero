@@ -51,14 +51,21 @@ class Tournament:
             self.participants.append(participant)
 
     def playoff(self, participant1, participant2):
+        arena = utils.Arena(self.game, participant1.agent, participant2.agent)
         try:
-            arena = utils.Arena(
-                self.game,
-                participant1.agent,
-                participant2.agent,
-                explore=False,
-                print_actions=False,
-                matches=self.matches)
+            arena.play_matches(
+                self.matches, explore=False, print_actions=False)
+        except Exception as e:
+            print(e)
+            print("exception during turn ", arena.player_index)
+            # if exception was during player1 turn, then player1 loses
+            if arena.player_index > 0:
+                winner = participant2
+                loser = participant1
+            else:
+                winner = participant1
+                loser = participant2
+        else:
             print("")
             if arena.stats[1] > arena.stats[-1]:
                 winner = participant1
@@ -72,15 +79,7 @@ class Tournament:
             else:
                 winner = participant2
                 loser = participant1
-        except Exception as e:
-            print(e)
-            print("exception during turn ", arena.player_index)
-            if arena.player_index > 0:
-                winner = participant2
-                loser = participant1
-            else:
-                winner = participant1
-                loser = participant2
+
         adjust_elo(winner, loser)
         return winner, loser
 
@@ -122,10 +121,11 @@ class TournamentParticipant:
             with utils.timeout(180):
                 self.agent = ai.Agent(self.tournament.game, str(self.id),
                                       model_path)
-                return True
         except Exception as e:
             print(e)
             print("create agent exception")
+        else:
+            return True
         return False
 
     def __lt__(self, opponent):
