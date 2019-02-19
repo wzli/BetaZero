@@ -4,7 +4,6 @@ from heapq import heapify
 from random import shuffle
 from betazero import ai, utils
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 
 
 def scan_models(directory):
@@ -93,12 +92,9 @@ class Tournament:
 
     def run_once(self, matches):
         # initialized uninitialized participants
-        uninitialized_participants = [
-            x for x in self.partifipants if not x.agent
-        ]
-        with ThreadPoolExecutor() as executor:
-            executor.map(lambda x: x.create_agent(),
-                         uninitialized_participants)
+        for x in self.participants:
+            if not x.agent:
+                x.create_agent()
         # set number of matches per playoff
         self.matches = matches
         # face-off similar ranking participants (assuming participants are ordered by elo)
