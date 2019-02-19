@@ -84,7 +84,7 @@ class Tournament:
                 winner = participant2
                 loser = participant1
             results = (winner, loser)
-            prev_elos = (x.elo for x in results)
+            prev_elos = [x.elo for x in results]
             adjust_elo(*results)
             for participant, prev_elo in zip(results, prev_elos):
                 print(participant.id, prev_elo, "->", participant.elo)
