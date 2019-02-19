@@ -2,6 +2,15 @@ import threading, queue, os, time
 import numpy as np
 from .utils import *
 
+#tempoary fix for:
+#https://github.com/tensorflow/tensorflow/issues/14048
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+set_session(tf.Session(config=config))
+
+
 ACTIONS = 0
 STATE_TRANSITIONS = 1
 REWARDS = 2
@@ -24,14 +33,6 @@ class Agent:
         self.save_counter = 0
         self.total_moves = 0
         self.total_rewards = 0
-
-        #tempoary fix for:
-        #https://github.com/tensorflow/tensorflow/issues/14048
-        import tensorflow as tf
-        from keras.backend.tensorflow_backend import set_session
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        set_session(tf.Session(config=config))
 
         # get value model
         from keras.models import load_model
