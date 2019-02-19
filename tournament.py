@@ -62,8 +62,8 @@ class Tournament:
             arena.play_matches(
                 self.matches, explore=False, print_actions=False)
         except Exception as e:
-            print(traceback.format_exc(), "\nexception during turn ",
-                  arena.player_index)
+            print("exception during turn ", arena.player_index,
+                  traceback.format_exc())
             # if exception was during player1 turn, then player1 loses
             if arena.player_index > 0:
                 return participant2, participant1
@@ -134,7 +134,7 @@ class TournamentParticipant:
                 self.agent = ai.Agent(self.tournament.game, str(self.id),
                                       model_path)
         except Exception as e:
-            print(traceback.format_exc(), "\ncreate agent exception")
+            print("create agent exception", traceback.format_exc())
             self.agent = None
 
     def __lt__(self, opponent):
