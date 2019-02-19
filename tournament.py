@@ -3,6 +3,7 @@ import argparse, os, yaml
 from heapq import heapify
 from random import shuffle
 from betazero import ai, utils
+import traceback
 
 
 def scan_models(directory):
@@ -56,8 +57,8 @@ class Tournament:
             arena.play_matches(
                 self.matches, explore=False, print_actions=False)
         except Exception as e:
-            print(e)
-            print("exception during turn ", arena.player_index)
+            print(traceback.format_exc(), "\nexception during turn ",
+                  arena.player_index)
             # if exception was during player1 turn, then player1 loses
             if arena.player_index > 0:
                 winner = participant2
@@ -122,8 +123,7 @@ class TournamentParticipant:
                 self.agent = ai.Agent(self.tournament.game, str(self.id),
                                       model_path)
         except Exception as e:
-            print(e)
-            print("create agent exception")
+            print(traceback.format_exc(), "\ncreate agent exception")
         else:
             return True
         return False
