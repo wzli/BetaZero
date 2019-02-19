@@ -58,16 +58,14 @@ class Tournament:
             agent1 = participant1.create_agent()
         except Exception:
             print("create agent exception", traceback.format_exc())
-            return participant2, participant1
-        finally:
             K.clear_session()
+            return participant2, participant1
         try:
             agent2 = participant2.create_agent()
         except Exception:
             print("create agent2 exception", traceback.format_exc())
-            return participant1, participant2
-        finally:
             K.clear_session()
+            return participant1, participant2
         # create arena
         arena = utils.Arena(self.game, agent1, agent2)
         try:
@@ -139,7 +137,7 @@ class TournamentParticipant:
                                        "model_" + str(self.id) + ".h5")
 
     def create_agent(self):
-        with timeout(60):
+        with utils.timeout(60):
             return ai.Agent(self.tournament.game, str(self.id),
                             self.model_path)
 
