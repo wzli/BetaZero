@@ -4,6 +4,7 @@ from heapq import heapify
 from random import shuffle
 from betazero import ai, utils
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 
 def scan_models(directory):
@@ -52,6 +53,11 @@ class Tournament:
             self.participants.append(participant)
 
     def playoff(self, participant1, participant2):
+        # lose if uninitialized
+        if not participant1.agent:
+            return participant2, participant1
+        if not participant2.agent:
+            return participant1, participant2
         arena = utils.Arena(self.game, participant1.agent, participant2.agent)
         try:
             arena.play_matches(
@@ -61,13 +67,11 @@ class Tournament:
                   arena.player_index)
             # if exception was during player1 turn, then player1 loses
             if arena.player_index > 0:
-                winner = participant2
-                loser = participant1
+                return participant2, participant1
             else:
-                winner = participant1
-                loser = participant2
+                return participant1, participant2
         else:
-            print("")
+            # if playoff was successful
             if arena.stats[1] > arena.stats[-1]:
                 winner = participant1
                 loser = participant2
@@ -80,10 +84,22 @@ class Tournament:
             else:
                 winner = participant2
                 loser = participant1
-        adjust_elo(winner, loser)
-        return winner, loser
+            results = (winner, loser)
+            prev_elos = (x.elo for x in results)
+            adjust_elo(*results)
+            for participant, prev_elo in zip(results, prev_elos):
+                print(participant.id, prev_elo, "->", participant.elo)
+            return results
 
     def run_once(self, matches):
+        # initialized uninitialized participants
+        uninitialized_participants = [
+            x for x in self.partifipants if not x.agent
+        ]
+        with ThreadPoolExecutor() as executor:
+            executor.map(lambda x: x.create_agent(),
+                         uninitialized_participants)
+        # set number of matches per playoff
         self.matches = matches
         # face-off similar ranking participants (assuming participants are ordered by elo)
         heapify(self.participants)
@@ -124,16 +140,9 @@ class TournamentParticipant:
         except Exception as e:
             print(traceback.format_exc(), "\ncreate agent exception")
             self.agent = None
-        else:
-            return True
-        return False
 
     def __lt__(self, opponent):
-        # create model if not already, default lose if exeption occurs
-        if not self.agent and not self.create_agent():
-            return False
-        if not opponent.agent and not opponent.create_agent():
-            return True
+        # assign playoff as the less than operator
         winner, loser = tournament.playoff(self, opponent)
         # it's a min heap, less is good
         return winner.id == self.id
