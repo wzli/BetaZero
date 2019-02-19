@@ -52,13 +52,26 @@ class Tournament:
             self.participants.append(participant)
 
     def playoff(self, participant1, participant2):
-        # lose if uninitialized
-        if not participant1.agent:
-            return participant2, participant1
-        if not participant2.agent:
-            return participant1, participant2
-        arena = utils.Arena(self.game, participant1.agent, participant2.agent)
+        from keras import backend as K
+        # create agents, lose on exception
         try:
+            agent1 = participant1.create_agent()
+        except Exception:
+            print("create agent exception", traceback.format_exc())
+            return participant2, participant1
+        finally:
+            K.clear_session()
+        try:
+            agent2 = participant2.create_agent()
+        except Exception:
+            print("create agent2 exception", traceback.format_exc())
+            return participant1, participant2
+        finally:
+            K.clear_session()
+        # create arena
+        arena = utils.Arena(self.game, agent1, agent2)
+        try:
+            # play matches
             arena.play_matches(
                 self.matches, explore=False, print_actions=False)
         except Exception as e:
@@ -89,12 +102,10 @@ class Tournament:
             for participant, prev_elo in zip(results, prev_elos):
                 print(participant.id, prev_elo, "->", participant.elo)
             return results
+        finally:
+            K.clear_session()
 
     def run_once(self, matches):
-        # initialized uninitialized participants
-        for x in self.participants:
-            if not x.agent:
-                x.create_agent()
         # set number of matches per playoff
         self.matches = matches
         # face-off similar ranking participants (assuming participants are ordered by elo)
@@ -124,18 +135,13 @@ class TournamentParticipant:
         self.id = agent_id
         self.elo = elo
         self.model_directory = model_directory
-        self.agent = None
+        self.model_path = os.path.join(self.model_directory,
+                                       "model_" + str(self.id) + ".h5")
 
     def create_agent(self):
-        model_path = os.path.join(self.model_directory,
-                                  "model_" + str(self.id) + ".h5")
-        try:
-            with utils.timeout(300):
-                self.agent = ai.Agent(self.tournament.game, str(self.id),
-                                      model_path)
-        except Exception as e:
-            print("create agent exception", traceback.format_exc())
-            self.agent = None
+        with timeout(60):
+            return ai.Agent(self.tournament.game, str(self.id),
+                            self.model_path)
 
     def __lt__(self, opponent):
         # assign playoff as the less than operator

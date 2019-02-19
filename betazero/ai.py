@@ -2,14 +2,6 @@ import threading, queue, os, time
 import numpy as np
 from .utils import *
 
-#tempoary fix for:
-#https://github.com/tensorflow/tensorflow/issues/14048
-import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-set_session(tf.Session(config=config))
-
 ACTIONS = 0
 STATE_TRANSITIONS = 1
 REWARDS = 2
@@ -33,18 +25,27 @@ class Agent:
         self.total_moves = 0
         self.total_rewards = 0
 
+        #tempoary fix for:
+        #https://github.com/tensorflow/tensorflow/issues/14048
+        import tensorflow as tf
+        from keras.backend.tensorflow_backend import set_session
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        set_session(tf.Session(config=config))
+
         # get value model
-        try:
-            from keras.models import load_model
-            self.value_model = load_model(model_path)
-        except OSError as e:
-            # if not training, bubble up error
-            if self.save_interval <= 0:
-                raise e
-            # create blank model
-            print(e, "\nFailed to load", model_path, "-> create new model")
-            self.value_model = game.ValueModel()
-        print(self.value_model.summary())
+        from keras.models import load_model
+        # if not training, bubble up error
+        if self.save_interval <= 0:
+            self.value_model = load_model(model_path, compile=False)
+        else:
+            try:
+                self.value_model = load_model(model_path)
+            except OSError as e:
+                # create blank model
+                print(e, "\nFailed to load", model_path, "-> create new model")
+                self.value_model = game.ValueModel()
+            print(self.value_model.summary())
 
         self.model_save_dir = os.path.join(
             save_dir, os.path.basename(self.model_path)) + ".save"
