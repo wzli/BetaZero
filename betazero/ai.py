@@ -167,11 +167,11 @@ class Agent:
         actions, _, rewards, reset_counts, value_pdfs = predictions
         # explore only if training, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
-        # othersize, don't sample, just take the expected value
+        # if not exploring, don't sample, just take the expected value
         if self.enable_training:
             value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
-            value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
+            value_sample = lambda value_pdf: expected_value(value_pdf, self.value_range)
         value_samples = np.array([
             reward + value_sample(value_pdf) if reset_count == 0 else
             reward for value_pdf, reward, reset_count in zip(
@@ -182,16 +182,17 @@ class Agent:
             np.argwhere(value_samples == np.amax(value_samples)).flat)]
         # print some debug info
         if verbose:
-            for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
+            for action_choice, _, action_reward, reset_count, value_pdf, value_sample in sorted(
                     zip(*predictions, value_samples), key=lambda x: x[-1]):
                 expected, variance = expected_value(value_pdf,
                                                     self.value_range, True)
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
-                print('ACT:', action_choice, '\tRWD:', action_reward, ""
-                      if not self.enable_training else
-                      '\t\tSMP ' + str(round(value_sample, 3)), '\tEXP',
-                      expected, '\tSTD:', deviation)
+                print('ACT:', action_choice, '\tRWD:', action_reward, end='')
+                if reset_count == 0:
+                    print('\tEXP', expected, '\tSTD:', deviation)
+                else:
+                    print('\tTerminal State')
             print(self.name, "played", action)
         return action
 
