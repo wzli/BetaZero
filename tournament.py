@@ -159,7 +159,7 @@ if __name__ == '__main__':
         help=
         'number of participants in the tornament (excess will be eliminated)')
     parser.add_argument(
-        '-n',
+        '-g',
         "--n-games",
         type=int,
         default=2,
