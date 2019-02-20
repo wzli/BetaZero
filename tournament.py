@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-import argparse, os, yaml
+import argparse, os, yaml, traceback
 from heapq import heapify
 from random import shuffle
 from betazero import ai, utils
-import traceback
 
 
 def scan_models(directory):
@@ -69,8 +68,8 @@ class Tournament:
         # create arena
         arena = utils.Arena(self.game, agent1, agent2)
         try:
-            # play matches
-            arena.play_matches(self.matches, print_actions=False)
+            # play match
+            arena.play_match(self.n_games, verbose=False)
         except Exception as e:
             print("exception during turn ", arena.player_index,
                   traceback.format_exc())
@@ -102,9 +101,9 @@ class Tournament:
         finally:
             K.clear_session()
 
-    def run_once(self, matches):
-        # set number of matches per playoff
-        self.matches = matches
+    def run_once(self, n_games):
+        # set n_games per playoff
+        self.n_games = n_games
         # face-off similar ranking participants (assuming participants are ordered by elo)
         heapify(self.participants)
         # face-off participants randomly
@@ -160,11 +159,11 @@ if __name__ == '__main__':
         help=
         'number of participants in the tornament (excess will be eliminated)')
     parser.add_argument(
-        '-m',
-        "--matches",
+        '-n',
+        "--n-games",
         type=int,
         default=2,
-        help='number of matchs per playoff')
+        help='number of games per playoff match')
     parser.add_argument(
         '-f',
         "--record-file",
@@ -216,7 +215,7 @@ if __name__ == '__main__':
         tournament.add_participants(args.model_directory, model_entries)
         models = current_models
         # run the tournament
-        tournament.run_once(args.matches)
+        tournament.run_once(args.n_games)
         # eliminate losers
         eliminated_participants = tournament.eliminate(args.n_participants)
         # refresh record

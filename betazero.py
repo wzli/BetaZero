@@ -70,7 +70,7 @@ if __name__ == '__main__':
             player2 = ai.Agent(game, "Agent", args.model)
     # start the game
     arena = utils.Arena(game, player1, player2)
-    arena.play_matches(
+    arena.play_match(
         first_turn=1 if args.first_turn else -1,
-        print_actions=not train,
+        verbose=not train,
     )

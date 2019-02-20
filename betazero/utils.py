@@ -127,43 +127,49 @@ class Arena:
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
 
-    def play_matches(self,
-                     matches=-1,
-                     first_turn=1,
-                     print_actions=True,
-                     turn_timeout=1000):
+    def play_match(self,
+                   n_games=-1,
+                   first_turn=1,
+                   verbose=True,
+                   turn_timeout=1000):
         self.player_index = first_turn
-        while matches != 0:
+        # play until n_games limit reached
+        while n_games != 0:
+            # play turns with a max timeout
             with timeout(turn_timeout):
-                if self.play_turn(self.player_index, print_actions):
+                reward, reset = self.play_turn(self.player_index, verbose)
+                if reset > 1:
+                    # game ended
+                    n_games -= 1
+                    # record stats if not self play
+                    if len(self.unique_players) > 1:
+                        if reward == 0:
+                            self.stats[0] += 1
+                        elif reward < 0:
+                            self.stats[-self.player_index] += 1
+                        elif reward > 0:
+                            self.stats[self.player_index] += 1
+                        self.score += reward * self.player_index
+                        if verbose:
+                            print(self.players[1].name, self.stats[1],
+                                  self.players[-1].name, self.stats[-1],
+                                  "ties", self.stats[0], "score/game",
+                                  self.score / sum(self.stats))
+                    # the other player's turn to go first
                     first_turn *= -1
                     self.player_index = first_turn
-                    matches -= 1
                 else:
+                    # game continues with next player's turn
                     self.player_index *= -1
 
-    def play_turn(self, player_index, print_actions):
+    def play_turn(self, player_index, verbose):
         player = self.players[player_index]
-        action = player.generate_action(verbose=print_actions)
+        action = player.generate_action(verbose=verbose)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
             print(player.name, ": INVALID ACTION", action)
-            action = player.generate_action(verbose=print_actions)
+            action = player.generate_action(verbose=verbose)
             state, reward, reset = self.session.do_action(action)
         for unique_player in self.unique_players:
             unique_player.update_session(state, reward, reset)
-        if len(self.unique_players) > 1 and reset > 1:
-            if reward == 0:
-                print("tie")
-                self.stats[0] += 1
-            elif reward < 0:
-                print(player.name, "loses")
-                self.stats[-player_index] += 1
-            elif reward > 0:
-                print(player.name, "wins")
-                self.stats[player_index] += 1
-            self.score += reward * player_index
-            print(self.players[1].name, self.stats[1], self.players[-1].name,
-                  self.stats[-1], "tie", self.stats[0], "avg",
-                  self.score / sum(self.stats))
-        return reset > 1
+        return reward, reset
