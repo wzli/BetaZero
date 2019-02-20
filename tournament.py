@@ -70,8 +70,7 @@ class Tournament:
         arena = utils.Arena(self.game, agent1, agent2)
         try:
             # play matches
-            arena.play_matches(
-                self.matches, explore=False, print_actions=False)
+            arena.play_matches(self.matches, print_actions=False)
         except Exception as e:
             print("exception during turn ", arena.player_index,
                   traceback.format_exc())

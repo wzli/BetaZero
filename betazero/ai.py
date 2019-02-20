@@ -10,7 +10,6 @@ config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 set_session(tf.Session(config=config))
 
-
 ACTIONS = 0
 STATE_TRANSITIONS = 1
 REWARDS = 2
@@ -29,6 +28,7 @@ class Agent:
         self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
+        self.enable_training = save_interval > 0
         self.save_time = time.time()
         self.save_counter = 0
         self.total_moves = 0
@@ -37,9 +37,7 @@ class Agent:
         # get value model
         from keras.models import load_model
         # if not training, bubble up error
-        if self.save_interval <= 0:
-            self.value_model = load_model(model_path, compile=False)
-        else:
+        if self.enable_training:
             try:
                 self.value_model = load_model(model_path)
             except OSError as e:
@@ -47,6 +45,8 @@ class Agent:
                 print(e, "\nFailed to load", model_path, "-> create new model")
                 self.value_model = game.ValueModel()
             print(self.value_model.summary())
+        else:
+            self.value_model = load_model(model_path, compile=False)
 
         self.model_save_dir = os.path.join(
             save_dir, os.path.basename(self.model_path)) + ".save"
@@ -65,7 +65,7 @@ class Agent:
         self.action_prediction_history = []
 
         # continue below only if training is required
-        if self.save_interval <= 0:
+        if not self.enable_training:
             return
 
         # setup tensorboard callback
@@ -156,7 +156,7 @@ class Agent:
             np.vstack(input_arrays), batch_size=len(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, state=None, explore=True, verbose=False):
+    def generate_action(self, state=None, verbose=False):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
         predictions = self.generate_predictions(
@@ -165,10 +165,10 @@ class Agent:
         if not predictions:
             return None
         actions, _, rewards, reset_counts, value_pdfs = predictions
-        # if explore, Thompson Sampling based action selection:
+        # explore only if training, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
         # othersize, don't sample, just take the expected value
-        if explore:
+        if self.enable_training:
             value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
             value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
@@ -189,7 +189,7 @@ class Agent:
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
                 print('ACT:', action_choice, '\tRWD:', action_reward, ""
-                      if not explore else
+                      if not self.enable_training else
                       '\t\tSMP ' + str(round(value_sample, 3)), '\tEXP',
                       expected, '\tSTD:', deviation)
             print(self.name, "played", action)
@@ -263,9 +263,8 @@ class Agent:
         action_predictions = self.generate_predictions(
             state.flip() if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
-        train = self.save_interval > 0
         if reset_count != 0:
-            if train:
+            if self.enable_training:
                 # if the game resets, train the network
                 training_set = self.generate_training_set(
                     reset_count, self.game.terminal_state)
@@ -284,7 +283,7 @@ class Agent:
                 self.state_history[-1].flip()
                 if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
-        elif train and reward != 0 and self.game.reward_span > 1:
+        elif self.enable_training and reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)

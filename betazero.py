@@ -12,7 +12,7 @@ class Player:
         self.state = state.flip()
         self.reset = reset
 
-    def generate_action(self, explore=True, verbose=True):
+    def generate_action(self, verbose=True):
         print('\n', self.state)
         if self.reset > 1:
             print('\n', self.game.Session().reset()[0])
@@ -59,8 +59,7 @@ if __name__ == '__main__':
         player1 = ai.Agent(game, "Agent", args.model, args.save_interval,
                            args.save_directory)
         if args.adversary:
-            player2 = ai.Agent(game, "Adversary", args.adversary,
-                               args.save_interval, args.save_directory)
+            player2 = ai.Agent(game, "Adversary", args.adversary)
         else:
             player2 = player1
     else:
@@ -68,12 +67,10 @@ if __name__ == '__main__':
         if args.adversary:
             player2 = Player(game, "Player2")
         else:
-            player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
-                               args.save_directory)
+            player2 = ai.Agent(game, "Agent", args.model)
     # start the game
     arena = utils.Arena(game, player1, player2)
     arena.play_matches(
         first_turn=1 if args.first_turn else -1,
-        explore=train,
         print_actions=not train,
     )
