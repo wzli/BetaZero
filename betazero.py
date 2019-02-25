@@ -2,6 +2,17 @@
 import argparse
 from betazero import ai, utils
 
+# print trace on ctrl-\ for debugging
+import signal, traceback, sys
+
+
+def debug_signal_handler(signal, frame):
+    print(''.join(traceback.format_stack()))
+    sys.stdout.flush()
+
+
+signal.signal(signal.SIGQUIT, debug_signal_handler)
+
 
 class Player:
     def __init__(self, game, name):
