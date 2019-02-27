@@ -1,4 +1,4 @@
-import threading, queue, os, time
+import threading, queue, os, time, sys
 import numpy as np
 from .utils import *
 
@@ -104,6 +104,7 @@ class Agent:
                 break
             except queue.Full:
                 print("Queue Full at ", self.total_moves)
+                sys.stdout.flush()
 
     def save_model(self, training_set, original_training_set):
         # create save directory if doesn't exist
@@ -274,6 +275,7 @@ class Agent:
                     self.queue_training_set(training_set)
                 else:
                     self.save_model(*training_set)
+                    sys.exit(0)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
