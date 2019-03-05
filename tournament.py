@@ -54,19 +54,19 @@ class Tournament:
         from keras import backend as K
         # create agents, lose on exception
         try:
-            agent1 = participant1.create_agent()
+            participant1.create_agent()
         except Exception:
-            print("create agent exception", traceback.format_exc())
+            print("create agent1 exception", traceback.format_exc())
             K.clear_session()
             return participant2, participant1
         try:
-            agent2 = participant2.create_agent()
+            participant2.create_agent()
         except Exception:
             print("create agent2 exception", traceback.format_exc())
             K.clear_session()
             return participant1, participant2
         # create arena
-        arena = utils.Arena(self.game, agent1, agent2)
+        arena = utils.Arena(self.game, participant1.agent, participant2.agent)
         try:
             # play match
             arena.play_match(self.n_games, verbose=False)
@@ -113,9 +113,19 @@ class Tournament:
         self.participants.sort(key=lambda x: x.elo, reverse=True)
 
     def eliminate(self, n_remaining):
+        # filter out participants who's models failed to load
+        eliminated = [
+            participant for participant in self.participants
+            if participant.agent is None
+        ]
+        self.participants = [
+            participant for participant in self.participants
+            if participant.agent is not None
+        ]
+        # limit the max number of participants
         if n_remaining >= len(self.participants):
-            return []
-        eliminated = self.participants[n_remaining:]
+            return eliminated
+        eliminated.extend(self.participants[n_remaining:])
         self.participants = self.participants[:n_remaining]
         # normalize elo
         average_elo = sum(
@@ -128,6 +138,7 @@ class Tournament:
 class TournamentParticipant:
     def __init__(self, tournament, model_directory, agent_id, elo):
         self.tournament = tournament
+        self.agent = None
         self.id = agent_id
         self.elo = elo
         self.model_directory = model_directory
@@ -136,8 +147,9 @@ class TournamentParticipant:
 
     def create_agent(self):
         with utils.timeout(60):
-            return ai.Agent(self.tournament.game, str(self.id),
-                            self.model_path)
+            self.agent = ai.Agent(self.tournament.game, str(self.id),
+                                  self.model_path)
+        return self.agent
 
     def __lt__(self, opponent):
         # assign playoff as the less than operator
@@ -154,7 +166,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-n',
         "--n-participants",
-        default=15,
+        default=31,
         type=int,
         help=
         'number of participants in the tornament (excess will be eliminated)')
