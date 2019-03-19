@@ -2,6 +2,17 @@
 import argparse
 from betazero import ai, utils
 
+# print trace on ctrl-\ for debugging
+import signal, traceback, sys
+
+
+def debug_signal_handler(signal, frame):
+    print(''.join(traceback.format_stack()))
+    sys.stdout.flush()
+
+
+signal.signal(signal.SIGQUIT, debug_signal_handler)
+
 
 class Player:
     def __init__(self, game, name):
@@ -12,7 +23,7 @@ class Player:
         self.state = state.flip()
         self.reset = reset
 
-    def generate_action(self, explore=True, verbose=True):
+    def generate_action(self, verbose=True):
         print('\n', self.state)
         if self.reset > 1:
             print('\n', self.game.Session().reset()[0])
@@ -25,17 +36,15 @@ if __name__ == '__main__':
     games = ['go', 'chinese_chess', 'tic_tac_toe']
     parser = argparse.ArgumentParser(description='BetaZero App')
     parser.add_argument("game", choices=games, help='select game')
-    parser.add_argument(
-        '-s', '--self-train', action="store_true", help='self training mode')
     parser.add_argument('-m', '--model', help='path to the hdf5 model file')
     parser.add_argument(
-        '-a', '--adversary', help='path to the adversary hdf5 model file')
-    parser.add_argument(
-        '-i',
+        '-s',
         '--save-interval',
         type=int,
-        default=1000,
-        help='save model every i moves trained, zero disables autosave')
+        default=0,
+        help='save model every i moves trained, zero disables training')
+    parser.add_argument(
+        '-a', '--adversary', help='path to the adversary hdf5 model file')
     parser.add_argument(
         '-d',
         '--save-directory',
@@ -56,12 +65,12 @@ if __name__ == '__main__':
     elif args.game == games[2]:
         from betazero import tic_tac_toe as game
     # logic to decide who is playing
-    if args.self_train:
+    train = args.save_interval > 0
+    if train:
         player1 = ai.Agent(game, "Agent", args.model, args.save_interval,
                            args.save_directory)
         if args.adversary:
-            player2 = ai.Agent(game, "Adversary", args.adversary,
-                               args.save_interval, args.save_directory)
+            player2 = ai.Agent(game, "Adversary", args.adversary)
         else:
             player2 = player1
     else:
@@ -69,12 +78,10 @@ if __name__ == '__main__':
         if args.adversary:
             player2 = Player(game, "Player2")
         else:
-            player2 = ai.Agent(game, "Agent", args.model, args.save_interval,
-                               args.save_directory)
+            player2 = ai.Agent(game, "Agent", args.model)
     # start the game
-    utils.Arena(
-        game,
-        player1,
-        player2,
-        print_actions=not args.self_train,
-        go_first=args.first_turn)
+    arena = utils.Arena(game, player1, player2)
+    arena.play_match(
+        first_turn=1 if args.first_turn else -1,
+        verbose=not train,
+    )

@@ -8,7 +8,8 @@ rotational_symetry = True
 vertical_symetry = True
 horizontal_symetry = True
 terminal_state = False
-reward_span = 4
+reward_span = 10
+max_turns = board_size[0] * board_size[1] * 2
 
 
 # keras model, based on alphazero and mobilenetv2
@@ -81,7 +82,7 @@ def ValueModelMNV2():
     return model
 
 
-def ValueModel_old():
+def ValueModel():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
@@ -92,7 +93,7 @@ def ValueModel_old():
     output_dimension = 2 * max_value + 1
     filter_size = (3, 3)
     n_filters = 128
-    n_res_blocks = 10
+    n_res_blocks = 20
     batch_norm_momentum = 0.999
     l2_reg = 1e-4
 
@@ -137,7 +138,7 @@ def ValueModel_old():
     return model
 
 
-def ValueModel():
+def ValueModel_orig():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
@@ -200,8 +201,6 @@ def ValueModel():
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
-
-
 
 
 # go helpers
@@ -373,6 +372,10 @@ class Session:
             else:
                 self.turn_pass = True
                 self.ko = None
+            # end the game after a turn limit
+            if self.n_turns > max_turns:
+                reset = self.n_turns
+                self.reset()
         else:
             if action:
                 board, group_lookup, captured_group = place_stone(

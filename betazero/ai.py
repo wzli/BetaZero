@@ -1,6 +1,14 @@
-import os, time
+import threading, queue, os, time, sys
 import numpy as np
 from .utils import *
+
+#tempoary fix for:
+#https://github.com/tensorflow/tensorflow/issues/14048
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+set_session(tf.Session(config=config))
 
 ACTIONS = 0
 STATE_TRANSITIONS = 1
@@ -20,26 +28,33 @@ class Agent:
         self.name = name
         self.model_path = model_path
         self.save_interval = save_interval
+        self.enable_training = save_interval > 0
         self.save_time = time.time()
         self.save_counter = 0
         self.total_moves = 0
         self.total_rewards = 0
 
         # get value model
-        try:
-            from keras.models import load_model
-            self.value_model = load_model(model_path)
-        except OSError:
-            print("Failed to load", model_path, "-> create new model")
-            self.value_model = game.ValueModel()
-        print(self.value_model.summary())
+        from keras.models import load_model
+        # if not training, bubble up error
+        if self.enable_training:
+            try:
+                self.value_model = load_model(model_path)
+            except OSError as e:
+                # create blank model
+                print(e, "\nFailed to load", model_path, "-> create new model")
+                self.value_model = game.ValueModel()
+            print(self.value_model.summary())
+        else:
+            self.value_model = load_model(model_path, compile=False)
 
         self.model_save_dir = os.path.join(
             save_dir, os.path.basename(self.model_path)) + ".save"
 
         # compute constants
-        self.symetric_set_size = ((int(game.rotational_symetry) + 1) * (int(
-            game.vertical_symetry) + 1) * (int(game.horizontal_symetry) + 1))
+        self.symetric_set_size = ((int(game.rotational_symetry) + 1) *
+                                  (int(game.vertical_symetry) + 1) *
+                                  (int(game.horizontal_symetry) + 1))
 
         self.value_range = np.linspace(
             -game.max_value, game.max_value,
@@ -49,53 +64,77 @@ class Agent:
         self.state_history = []
         self.action_prediction_history = []
 
+        # continue below only if training is required
+        if not self.enable_training:
+            return
 
-    def train_set(self, training_set, original_training_set):
-        if (self.save_interval > 0) and (self.save_counter >=
-                                         self.save_interval):
-            try:
-                self.training_callbacks
-            except AttributeError:
-                # setup tensorboard callback
-                from keras.callbacks import TensorBoard
-                self.training_callbacks = [
-                    TensorBoard(
-                        log_dir=self.model_save_dir,
-                        histogram_freq=1,
-                        write_graph=False,
-                        write_grads=True,
-                        write_images=True)
-                ]
-                # create save directory if doesn't exist
-                if not os.path.exists(self.model_save_dir):
-                    print("Save directory", self.model_save_dir,
-                          "doesn't exist -> create new folder")
-                    os.makedirs(self.model_save_dir)
-            self.save_counter = 0
-            self.value_model.fit(
-                *training_set,
-                verbose=0,
-                validation_split=0.99,
-                callbacks=self.training_callbacks)
-            print(self.name, "model saved at move", self.total_moves)
-            print("reward/move", self.total_rewards / self.total_moves)
-            print("time elapsed", time.time() - self.save_time, "seconds")
-            self.save_time = time.time()
-            self.value_model.save(
-                os.path.join(self.model_save_dir,
-                             "model_" + str(int(self.save_time)) + '.h5'))
-            self.value_model.save(self.model_path)
-            for i, (x, y) in enumerate(zip(*original_training_set)):
-                expected, variance = expected_value(y, self.value_range, True)
-                expected = round(expected, 3)
-                deviation = round(variance**0.5, 3)
-                print(x, "\nexpected value", expected, "deviation", deviation,
-                      "step", i + 1, "\n")
-        else:
+        # setup tensorboard callback
+        from keras.callbacks import TensorBoard
+        self.training_callbacks = [
+            TensorBoard(
+                log_dir=self.model_save_dir,
+                histogram_freq=1,
+                write_graph=False,
+                write_grads=True,
+                write_images=True)
+        ]
+
+        # train on a seperate thread
+        self.value_model._make_train_function()
+        self.value_model._make_test_function()
+        self.training_queue = queue.Queue(10)
+        self.training_thread = threading.Thread(target=self.training_loop)
+        self.training_thread.daemon = True
+        self.training_thread.start()
+
+    def training_loop(self):
+        # main loop for training thread
+        while True:
+            training_set, original_training_set = self.training_queue.get()
             self.value_model.fit(*training_set, verbose=0)
-        n_moves = len(original_training_set[0])
-        self.total_moves += n_moves
-        self.save_counter += n_moves
+            n_moves = len(original_training_set[0])
+            self.total_moves += n_moves
+            self.save_counter += n_moves
+            self.training_queue.task_done()
+
+    def queue_training_set(self, training_set):
+        while True:
+            try:
+                self.training_queue.put(training_set, timeout=5)
+                break
+            except queue.Full:
+                print("Queue Full at ", self.total_moves)
+                sys.stdout.flush()
+
+    def save_model(self, training_set, original_training_set):
+        # create save directory if doesn't exist
+        if not os.path.exists(self.model_save_dir):
+            print("Save directory", self.model_save_dir,
+                  "doesn't exist -> create new folder")
+            os.makedirs(self.model_save_dir)
+        # reset save counter
+        self.save_counter = 0
+        # use keras tensorboard callback for logging
+        self.value_model.fit(
+            *training_set,
+            verbose=0,
+            validation_split=0.99,
+            callbacks=self.training_callbacks)
+        # print most recent game history
+        print(self.name, "model saved at move", self.total_moves)
+        print("reward/move", self.total_rewards / self.total_moves)
+        print("time elapsed", time.time() - self.save_time, "seconds")
+        self.save_time = time.time()
+        self.value_model.save(
+            os.path.join(self.model_save_dir,
+                         "model_" + str(int(self.save_time)) + '.h5'))
+        self.value_model.save(self.model_path)
+        for i, (x, y) in enumerate(zip(*original_training_set)):
+            expected, variance = expected_value(y, self.value_range, True)
+            expected = round(expected, 3)
+            deviation = round(variance**0.5, 3)
+            print(x, "\nexpected value", expected, "deviation", deviation,
+                  "step", i + 1, "\n")
 
     def generate_predictions(self, state):
         """from current state generate a tuple of:
@@ -110,13 +149,15 @@ class Agent:
             zip(*(self.game.predict_action(state, action)
                   for action in actions)))
         # generate input arrays, usually this takes high CPU so parallelize
-        input_arrays = (state_transition.array()
-                        for state_transition in state_transitions)
+        input_arrays = [
+            state_transition.array() for state_transition in state_transitions
+        ]
         # use model to predict the value pdf of each action in action space
-        value_pdfs = self.value_model.predict(np.vstack(input_arrays))
+        value_pdfs = self.value_model.predict(
+            np.vstack(input_arrays), batch_size=len(input_arrays))
         return actions, state_transitions, rewards, reset_counts, value_pdfs
 
-    def generate_action(self, explore=True, state=None, verbose=False):
+    def generate_action(self, state=None, verbose=False):
         """generate an intelligent action given current state in perspective of action making player"""
         # based on prevously updated state by default
         predictions = self.generate_predictions(
@@ -125,13 +166,13 @@ class Agent:
         if not predictions:
             return None
         actions, _, rewards, reset_counts, value_pdfs = predictions
-        # if explore, Thompson Sampling based action selection:
+        # explore only if training, Thompson Sampling based action selection:
         # Samples the predicted value distribution of each possible action
-        # othersize, don't sample, just take the expected value
-        if explore:
+        # if not exploring, don't sample, just take the expected value
+        if self.enable_training:
             value_sample = lambda value_pdf: np.random.choice(self.value_range, p=value_pdf)
         else:
-            value_sample = lambda value_pdf: np.average(self.value_range, weights=value_pdf)
+            value_sample = lambda value_pdf: expected_value(value_pdf, self.value_range)
         value_samples = np.array([
             reward + value_sample(value_pdf) if reset_count == 0 else
             reward for value_pdf, reward, reset_count in zip(
@@ -142,16 +183,17 @@ class Agent:
             np.argwhere(value_samples == np.amax(value_samples)).flat)]
         # print some debug info
         if verbose:
-            for action_choice, _, action_reward, _, value_pdf, value_sample in sorted(
+            for action_choice, _, action_reward, reset_count, value_pdf, value_sample in sorted(
                     zip(*predictions, value_samples), key=lambda x: x[-1]):
                 expected, variance = expected_value(value_pdf,
                                                     self.value_range, True)
                 expected = round(expected, 3)
                 deviation = round(variance**0.5, 3)
-                print('ACT:',
-                      action_choice, '\tRWD:', action_reward, '\t\tSMP',
-                      round(value_sample,
-                            3), '\tEXP', expected, '\tSTD:', deviation)
+                print('ACT:', action_choice, '\tRWD:', action_reward, end='')
+                if reset_count == 0:
+                    print('\tEXP', expected, '\tSTD:', deviation)
+                else:
+                    print('\tTerminal State')
             print(self.name, "played", action)
         return action
 
@@ -164,7 +206,7 @@ class Agent:
         # generate input set based on recent history
         original_input_set = self.state_history[-steps:]
         training_input_set = np.vstack(
-            (input_state.array() for input_state in original_input_set))
+            [input_state.array() for input_state in original_input_set])
         # generate symetric input arrays
         training_input_set = np.vstack(
             symetric_arrays(training_input_set, self.game.rotational_symetry,
@@ -211,7 +253,7 @@ class Agent:
         return (training_input_set, training_target_set), (original_input_set,
                                                            original_target_set)
 
-    def update_session(self, state, reward, reset_count, train=True):
+    def update_session(self, state, reward, reset_count):
         if reset_count < 0:
             raise ValueError(self.name + ": reset_count < 0")
         # save in history
@@ -224,26 +266,31 @@ class Agent:
             state.flip() if self.game.min_max else state)
         self.action_prediction_history.append(action_predictions)
         if reset_count != 0:
-            if train:
+            if self.enable_training:
                 # if the game resets, train the network
                 training_set = self.generate_training_set(
                     reset_count, self.game.terminal_state)
-                self.train_set(*training_set)
+                # save model if counter is reached
+                if self.save_counter < self.save_interval:
+                    self.queue_training_set(training_set)
+                else:
+                    self.save_model(*training_set)
+                    sys.exit(0)
             # discard history of the previous game after it's been trained
             self.state_history = self.state_history[:-reset_count]
             self.action_prediction_history = self.action_prediction_history[:
                                                                             -reset_count
-                                                                            -
-                                                                            1]
+                                                                            - 1]
             # re-predict actions for initial state after training
-            action_predictions = self.generate_predictions(self.state_history[
-                -1].flip() if self.game.min_max else self.state_history[-1])
+            action_predictions = self.generate_predictions(
+                self.state_history[-1].flip()
+                if self.game.min_max else self.state_history[-1])
             self.action_prediction_history.append(action_predictions)
-        elif train and reward != 0 and self.game.reward_span > 1:
+        elif self.enable_training and reward != 0 and self.game.reward_span > 1:
             # reward received, train the network
             training_set = self.generate_training_set(self.game.reward_span,
                                                       False)
-            self.train_set(*training_set)
+            self.queue_training_set(training_set)
         elif not self.action_prediction_history[-1]:
-            raise ValueError(self.name +
-                             ": no more actions but game doesn't reset")
+            raise ValueError(
+                self.name + ": no more actions but game doesn't reset")

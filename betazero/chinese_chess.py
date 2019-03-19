@@ -8,12 +8,68 @@ rotational_symetry = False
 vertical_symetry = True
 horizontal_symetry = True
 terminal_state = True
-reward_span = 6
+reward_span = 10
 max_stalemate_count = 30
 
 
-# keras model, based on alphazero and mobilenetv2
 def ValueModel():
+    from keras.models import Model
+    from keras import regularizers
+    from keras.layers import Conv2D, Dense, Flatten, Input, ReLU
+    from keras.layers.normalization import BatchNormalization
+    from keras.layers.merge import Add
+
+    input_dimensions = (8, *board_size)
+    output_dimension = 2 * max_value + 1
+    filter_size = (3, 3)
+    n_filters = 128
+    n_res_blocks = 20
+    batch_norm_momentum = 0.999
+    l2_reg = 1e-4
+
+    inputs = Input(shape=input_dimensions)
+    x = Conv2D(
+        n_filters,
+        filter_size,
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        data_format="channels_first")(inputs)
+    # residual blocks
+    for i in range(n_res_blocks):
+        x_in = x
+        x = BatchNormalization(momentum=batch_norm_momentum)(x)
+        x = ReLU(6.)(x)
+        x = Conv2D(
+            n_filters,
+            filter_size,
+            padding='same',
+            use_bias=False,
+            kernel_regularizer=regularizers.l2(l2_reg),
+            data_format="channels_first")(x)
+        x = Add()([x, x_in])
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = Conv2D(
+        1, (1, 1),
+        padding='same',
+        use_bias=False,
+        kernel_regularizer=regularizers.l2(l2_reg),
+        data_format="channels_first")(x)
+    x = BatchNormalization(momentum=batch_norm_momentum)(x)
+    x = ReLU(6.)(x)
+    x = Flatten()(x)
+    outputs = Dense(
+        output_dimension,
+        activation='softmax',
+        kernel_regularizer=regularizers.l2(l2_reg))(x)
+    model = Model(inputs, outputs)
+    model.compile(loss='categorical_crossentropy', optimizer='adam')
+    return model
+
+
+# keras model, based on alphazero and mobilenetv2
+def ValueModelMNV2():
     from keras.models import Model
     from keras import regularizers
     from keras.layers import Conv2D, DepthwiseConv2D, Dense, Flatten, Input, ReLU
@@ -140,13 +196,14 @@ def is_valid_move(board, player, move):
     return True
 
 
-def get_banned_move(move_history):
-    if len(move_history) < 3:
+def get_banned_move(action_history):
+    if len(action_history) < 4:
         return None
-    opponent_location, opponent_move = move_history[-1]
-    if (opponent_move, opponent_location) == move_history[-3]:
-        move, location = move_history[-2]
-        return (location, move)
+    opponent_location, opponent_move = action_history[-1]
+    if (opponent_move, opponent_location) == action_history[-3]:
+        previous_location, previous_move = action_history[-2]
+        if (action_history[-4][1] == previous_location):
+            return (previous_move, previous_location)
 
 
 def move_piece(board, location, move):
@@ -224,8 +281,8 @@ def elephant_moves(board, location):
         move for move in ((row + 2, col + 2), (row + 2, col - 2),
                           (row - 2, col + 2), (row - 2, col - 2))
         if is_valid_move(board, player, move)
-        and not is_across_river(player, move)
-        and board[(move[0] + row) // 2, (move[1] + col) // 2] == EMPTY
+        and not is_across_river(player, move) and board[(move[0] + row) // 2, (
+            move[1] + col) // 2] == EMPTY
     ]
 
 
@@ -247,13 +304,13 @@ def king_moves(board, location):
                           (row - 1, col))
         if is_valid_move(board, player, move) and is_in_palace(player, move)
     ]
-    col += player
+    row += player
     while is_within_bounds((row, col)):
         if board[row, col] != EMPTY:
             if enemy(board[(row, col)]) == board[location]:
                 moves.append((row, col))
             break
-        col += player
+        row += player
     return moves
 
 
@@ -340,7 +397,7 @@ class Session:
     def reset(self):
         self.player = 1
         self.board = np.zeros(board_size, dtype=np.int8)
-        self.move_history = []
+        self.action_history = []
         self.stalemate_count = 0
         for piece, location in red_spawn:
             self.board[location] = piece
@@ -350,29 +407,30 @@ class Session:
 
     def do_action(self, action):
         location, move = action
-        if (not is_within_bounds(location)
+        if (not location or not move or not is_within_bounds(location)
                 or get_player(self.board[location]) != self.player
                 or move not in moves_lookup[self.board[location]](self.board,
                                                                   location)
-                or action == get_banned_move(self.move_history)):
-            return State(self.board, self.player, self.move_history[-3:],
-                         len(self.move_history),
+                or (self.stalemate_count > 2
+                    and action == get_banned_move(self.action_history))):
+            return State(self.board, self.player, self.action_history[-4:],
+                         len(self.action_history),
                          self.stalemate_count), -max_value, 1
         board, reward = move_piece(self.board, location, move)
-        self.move_history.append(action)
+        self.action_history.append(action)
         self.player *= -1
         if reward == 0:
             self.stalemate_count += 1
         else:
             self.stalemate_count = 0
         if reward >= max_value or self.stalemate_count >= max_stalemate_count:
-            reset = len(self.move_history)
+            reset = len(self.action_history)
             self.reset()
         else:
             self.board = board
             reset = 0
-        return State(board, -self.player, self.move_history[-3:],
-                     len(self.move_history),
+        return State(board, -self.player, self.action_history[-4:],
+                     len(self.action_history),
                      self.stalemate_count), reward, reset
 
 
@@ -383,18 +441,18 @@ class State:
     def __init__(self,
                  board,
                  player,
-                 move_history=[],
+                 action_history=[],
                  n_turns=0,
                  stalemate_count=0):
         self.board = board
         self.player = player
-        self.move_history = move_history
+        self.action_history = action_history
         self.n_turns = n_turns
         self.stalemate_count = stalemate_count
 
     def flip(self):
-        return State(self.board, -self.player, self.move_history, self.n_turns,
-                     self.stalemate_count)
+        return State(self.board, -self.player, self.action_history,
+                     self.n_turns, self.stalemate_count)
 
     def array(self):
         board_array = np.zeros((8, *board_size), dtype=np.int8)
@@ -405,9 +463,8 @@ class State:
                     1]] = piece_player * self.player
                 for move in moves_lookup[piece](self.board, location):
                     if self.board[move] != EMPTY:
-                        board_array[0, move[0], move[
-                            1]] = rewards_lookup[self.
-                                                 board[move]] * piece_player * self.player
+                        board_array[0, move[0], move[1]] = rewards_lookup[
+                            self.board[move]] * piece_player * self.player
         return board_array[np.newaxis]
 
     def key(self):
@@ -423,8 +480,10 @@ class State:
 
 def get_actions(state):
     """Returns the list of all valid actions given a game state."""
-    banned_move = get_banned_move(state.move_history)
-    return [(location, move) for location, piece in np.ndenumerate(state.board)
+    banned_move = get_banned_move(
+        state.action_history) if state.stalemate_count > 2 else None
+    return [(location, move)
+            for location, piece in np.ndenumerate(state.board)
             if get_player(piece) == state.player
             for move in moves_lookup[piece](state.board, location)
             if (location, move) != banned_move]
@@ -435,10 +494,10 @@ def predict_action(state, action):
     stalemate_count = state.stalemate_count + 1 if reward == 0 else 0
     reset = state.n_turns + 1 if (
         reward >= max_value or stalemate_count >= max_stalemate_count) else 0
-    move_history = state.move_history[-2:].append(action)
-    return State(board, state.player, move_history, state.n_turns + 1,
+    action_history = state.action_history[-2:].append(action)
+    return State(board, state.player, action_history, state.n_turns + 1,
                  stalemate_count), reward, reset
 
 
 def get_human_action():
-    return tuple(parse_grid_input(board_size), parse_grid_input(board_size))
+    return parse_grid_input(board_size), parse_grid_input(board_size)

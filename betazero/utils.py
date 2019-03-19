@@ -1,6 +1,26 @@
 import numpy as np
 from math import floor
 
+import signal
+from contextlib import contextmanager
+
+
+@contextmanager
+def timeout(time):
+    # Register a function to raise a TimeoutError on the signal
+    def raise_timeout(signum, frame):
+        raise TimeoutError(str(time) + "s timeout exceeded")
+
+    signal.signal(signal.SIGALRM, raise_timeout)
+    # Schedule the signal to be sent after time
+    signal.alarm(time)
+    try:
+        # continue running code block
+        yield
+    finally:
+        # Unregister the signal
+        signal.signal(signal.SIGALRM, signal.SIG_IGN)
+
 
 def clip(value, upper, lower=0):
     return max(lower, min(upper, value))
@@ -77,10 +97,11 @@ def ascii_board(board):
 
 def parse_grid_input(board_size):
     while True:
+        input_str = input('enter "row col ...": ')
+        if input_str == "":
+            return None
         try:
-            move_index = tuple(
-                int(token)
-                for token in input('enter "row col ...": ').split(' '))
+            move_index = tuple(int(token) for token in input_str.split(' '))
         except ValueError:
             print("INTEGER PARSING ERROR")
             continue
@@ -95,62 +116,60 @@ def parse_grid_input(board_size):
 
 
 class Arena:
-    def __init__(self,
-                 game,
-                 player1,
-                 player2,
-                 print_actions=True,
-                 go_first=True,
-                 matches=-1):
+    def __init__(self, game, player1, player2):
         self.game = game
         self.session = self.game.Session()
-        self.players = (
-            None,
-            player1,
-            player2,
-        )
+        self.players = (None, player1, player2)
         self.unique_players = {player1, player2}
         self.stats = [0, 0, 0]
         self.score = 0
-        self.self_train = player1 == player2
         updates = self.session.reset()
         for unique_player in self.unique_players:
             unique_player.update_session(*updates)
-        first_turn = 1 if go_first else -1
-        player_index = first_turn
-        while matches != 0:
-            if self.play_turn(player_index, print_actions):
-                first_turn *= -1
-                player_index = first_turn
-                matches -= 1
-            else:
-                player_index *= -1
 
-    def play_turn(self, player_index, print_actions):
+    def play_match(self,
+                   n_games=-1,
+                   first_turn=1,
+                   verbose=True,
+                   turn_timeout=1000):
+        self.player_index = first_turn
+        # play until n_games limit reached
+        while n_games != 0:
+            # play turns with a max timeout
+            with timeout(turn_timeout):
+                reward, reset = self.play_turn(self.player_index, verbose)
+                if reset > 1:
+                    # game ended
+                    n_games -= 1
+                    # record stats if not self play
+                    if len(self.unique_players) > 1:
+                        if reward == 0:
+                            self.stats[0] += 1
+                        elif reward < 0:
+                            self.stats[-self.player_index] += 1
+                        elif reward > 0:
+                            self.stats[self.player_index] += 1
+                        self.score += reward * self.player_index
+                        if verbose:
+                            print(self.players[1].name, self.stats[1],
+                                  self.players[-1].name, self.stats[-1],
+                                  "ties", self.stats[0], "score/game",
+                                  self.score / sum(self.stats))
+                    # the other player's turn to go first
+                    first_turn *= -1
+                    self.player_index = first_turn
+                else:
+                    # game continues with next player's turn
+                    self.player_index *= -1
+
+    def play_turn(self, player_index, verbose):
         player = self.players[player_index]
-        action = player.generate_action(
-            explore=not print_actions, verbose=print_actions)
+        action = player.generate_action(verbose=verbose)
         state, reward, reset = self.session.do_action(action)
         while reset == 1:
-            print(player.name, ": INVALID ACTION")
-            action = player.generate_action(
-                explore=not print_actions, verbose=print_actions)
+            print(player.name, ": INVALID ACTION", action)
+            action = player.generate_action(verbose=verbose)
             state, reward, reset = self.session.do_action(action)
         for unique_player in self.unique_players:
-            unique_player.update_session(
-                state, reward, reset, train=self.self_train)
-        if not self.self_train and reset > 1:
-            if reward == 0:
-                print("tie")
-                self.stats[0] += 1
-            elif reward < 0:
-                print(player.name, "loses")
-                self.stats[-player_index] += 1
-            elif reward > 0:
-                print(player.name, "wins")
-                self.stats[player_index] += 1
-            self.score += reward * player_index
-            print(self.players[1].name, self.stats[1], self.players[-1].name,
-                  self.stats[-1], "tie", self.stats[0], "avg",
-                  self.score / sum(self.stats))
-        return reset > 1
+            unique_player.update_session(state, reward, reset)
+        return reward, reset
