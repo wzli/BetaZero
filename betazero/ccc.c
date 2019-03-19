@@ -21,10 +21,17 @@ typedef struct location {
     int8_t col;
 } Location;
 
-static const Location UNIT_DIRECTIONS[4] = { {0,1}, {0,-1},  {1, 0}, {-1, 0}};
-
-static inline Location translate_location(Location loc, int8_t direction, int8_t steps) {
-    return (Location){loc.row + UNIT_DIRECTIONS[direction].row * steps, loc.col + UNIT_DIRECTIONS[direction].col * steps};
+inline Location translate_location(Location loc, int8_t direction, int8_t forward_steps, int8_t side_steps) {
+    switch (direction & 0x3) {
+        case 0:
+            return (Location){loc.row + forward_steps, loc.col + side_steps};
+        case 1:
+            return (Location){loc.row + side_steps, loc.col - forward_steps};
+        case 2:
+            return (Location){loc.row - forward_steps, loc.col - side_steps};
+        default: 
+            return (Location){loc.row - side_steps, loc.col + forward_steps};
+    }
 }
  
 inline int8_t get_piece(const int8_t* board, Location loc) {
@@ -70,18 +77,18 @@ int8_t cannon_moves(Location* moves, const int8_t* board, Location loc) {
     int8_t player = get_player(get_piece(board, loc));
     int8_t dir, i;
     for(dir = 0; dir < 4; ++dir) {
-        moves[n_moves] = translate_location(loc, dir, 1);
+        moves[n_moves] = translate_location(loc, dir, 1, 0);
         for(i = 2; is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY; ++i) {
-            moves[++n_moves] = translate_location(loc, dir, i);
+            moves[++n_moves] = translate_location(loc, dir, i, 0);
         }
         ++i;
-        moves[n_moves] =  translate_location(loc, dir, i);
+        moves[n_moves] =  translate_location(loc, dir, i, 0);
         for(++i; is_within_bounds(moves[n_moves]); ++i) {
             if(get_player(get_piece(board, moves[n_moves])) == -player) {
                 ++n_moves;
                 break;
             }
-            moves[n_moves] =  translate_location(loc, dir, i);
+            moves[n_moves] =  translate_location(loc, dir, i, 0);
         }
     }
     return n_moves;
@@ -92,72 +99,97 @@ int8_t rook_moves(Location* moves, const int8_t* board, Location loc) {
     int8_t player = get_player(get_piece(board, loc));
     int8_t dir, i;
     for(dir = 0; dir < 4; ++dir) {
-        moves[n_moves] = translate_location(loc, dir, 1);
+        moves[n_moves] = translate_location(loc, dir, 1, 0);
         for(i = 2; is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY; ++i) {
-            moves[++n_moves] = translate_location(loc, dir, i);
+            moves[++n_moves] = translate_location(loc, dir, i, 0);
         }
-        n_moves += is_within_bounds(moves[n_moves]) && get_player(get_piece(board, moves[n_moves]) == -player);
+        n_moves += is_valid_move(board, player, moves[n_moves]);
     }
     return n_moves;
 }
 
+int8_t knight_moves(Location* moves, const int8_t* board, Location loc) {
+    int8_t n_moves = 0;
+    int8_t player = get_player(get_piece(board, loc));
+    int8_t dir;
+    for(dir = 0; dir < 4; ++dir) {
+        moves[n_moves] = translate_location(loc, dir, 1, 0);
+        if(is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY) {
+            moves[n_moves] = translate_location(loc, dir, 2, 1);
+            n_moves += is_valid_move(board, player,  moves[n_moves]);
+            moves[n_moves] = translate_location(loc, dir, 2, -1);
+            n_moves += is_valid_move(board, player,  moves[n_moves]);
+        }
+    }
+    return n_moves;
+}
+
+int8_t elephant_moves(Location* moves, const int8_t* board, Location loc) {
+    int8_t n_moves = 0;
+    int8_t player = get_player(get_piece(board, loc));
+    int8_t dir;
+    for(dir = 0; dir < 4; ++dir) {
+        moves[n_moves] = translate_location(loc, dir, 1, 1);
+        if(is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY) {
+            moves[n_moves] = translate_location(loc, dir, 2, 2);
+            n_moves += is_valid_move(board, player,  moves[n_moves]) && !is_across_river(player, moves[n_moves]);
+        }
+    }
+    return n_moves;
+}
+
+
+int8_t guard_moves(Location* moves, const int8_t* board, Location loc) {
+    int8_t n_moves = 0;
+    int8_t player = get_player(get_piece(board, loc));
+    int8_t dir;
+    for(dir = 0; dir < 4; ++dir) {
+        moves[n_moves] = translate_location(loc, dir, 1, 1);
+        n_moves += is_valid_move(board, player,  moves[n_moves]) && is_in_palace(player, moves[n_moves]);
+    }
+    return n_moves;
+}
+
+
+int8_t king_moves(Location* moves, const int8_t* board, Location loc) {
+    int8_t n_moves = 0;
+    int8_t player = get_player(get_piece(board, loc));
+    int8_t dir, i;
+    for(dir = 0; dir < 4; ++dir) {
+        moves[n_moves] = translate_location(loc, dir, 1, 0);
+        n_moves += is_valid_move(board, player,  moves[n_moves]) && is_in_palace(player, moves[n_moves]);
+    }
+    moves[n_moves] = (Location){loc.row + player, loc.col};
+    for(i = 2; is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY; ++i) {
+        moves[n_moves] = (Location){loc.row + (i * player), loc.col};
+    }
+    n_moves += is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) * player == -KING;
+    return n_moves;
+}
+
+int8_t piece_moves(Location* moves, const int8_t* board, Location loc) {
+    int8_t piece = get_piece(board, loc);
+    switch (piece < 0 ? -piece : piece) {
+        case PAWN:
+            return pawn_moves(moves, board, loc);
+        case CANNON:
+            return cannon_moves(moves, board, loc);
+        case ROOK:
+            return rook_moves(moves, board, loc);
+        case KNIGHT:
+            return knight_moves(moves, board, loc);
+        case ELEPHANT:
+            return elephant_moves(moves, board, loc);
+        case GUARD:
+            return guard_moves(moves, board, loc);
+        case KING:
+            return king_moves(moves, board, loc);
+        default:
+            return 0;
+    }
+}
+
 /*
-
-
-def knight_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = []
-    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        if (is_within_bounds((row + d_row, col + d_col))
-                and board[row + d_row, col + d_col] == EMPTY):
-            moves.extend([
-                move for move in (
-                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
-                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
-                ) if is_valid_move(board, player, move)
-            ])
-    return moves
-
-
-def elephant_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    return [
-        move for move in ((row + 2, col + 2), (row + 2, col - 2),
-                          (row - 2, col + 2), (row - 2, col - 2))
-        if is_valid_move(board, player, move)
-        and not is_across_river(player, move)
-        and board[(move[0] + row) // 2, (move[1] + col) // 2] == EMPTY
-    ]
-
-
-def guard_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    return [
-        move for move in ((row + 1, col + 1), (row + 1, col - 1),
-                          (row - 1, col + 1), (row - 1, col - 1))
-        if is_valid_move(board, player, move) and is_in_palace(player, move)
-    ]
-
-
-def king_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = [
-        move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
-                          (row - 1, col))
-        if is_valid_move(board, player, move) and is_in_palace(player, move)
-    ]
-    col += player
-    while is_within_bounds((row, col)):
-        if board[row, col] != EMPTY:
-            if enemy(board[(row, col)]) == board[location]:
-                moves.append((row, col))
-            break
-        col += player
-    return moves
 
 def get_banned_move(move_history):
     if len(move_history) < 3:
@@ -185,12 +217,14 @@ int main() {
     for(i = 0; i < 90; ++i) {
         board[i] = 0;
     }
-    //board[3] = 1;
+    board[3] = -1;
     board[6] = -1;
+    //board[4+9*2] = 1;
+    board[4+9*9] = -KING;
     Location moves[100];
 
-    board[0] = 1;
-    n_moves = rook_moves(moves, board, (Location){0,0});
+    board[4] = KING;
+    n_moves = piece_moves(moves, board, (Location){0,4});
  
     for(i = 0; i < n_moves; ++i) {
         printf("(%d,%d)\r\n", moves[i].row, moves[i].col);
