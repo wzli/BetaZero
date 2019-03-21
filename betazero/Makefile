@@ -6,14 +6,11 @@
 
 CFLAGS := -fPIC -O3 -Wall -Werror -std=c99
 CC := gcc
-MAJOR := 0
-MINOR := 1
 NAME := xiangqimoves
-VERSION := $(MAJOR).$(MINOR)
 
-lib: lib$(NAME).so.$(VERSION)
+lib: lib$(NAME).so
 
-lib$(NAME).so.$(VERSION): $(NAME).o
+lib$(NAME).so: $(NAME).o
 	$(CC) -shared -Wl,-soname,lib$(NAME).so.$(MAJOR) $^ -o $@
 
 clean:
