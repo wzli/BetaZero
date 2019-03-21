@@ -340,12 +340,15 @@ class State:
         self.action_history = action_history
         self.n_turns = n_turns
         self.stalemate_count = stalemate_count
+        self.internal_array = None
 
     def flip(self):
         return State(self.board, -self.player, self.action_history,
                      self.n_turns, self.stalemate_count)
 
     def array(self):
+        if(self.internal_array is not None):
+            return self.internal_array
         board_array = np.zeros((8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
             if piece != EMPTY:
@@ -358,7 +361,8 @@ class State:
                 board_array[0, moves_buf[i].row, moves_buf[i]
                             .col] = rewards_lookup[piece] * get_player(
                                 piece) * self.player
-        return board_array[np.newaxis]
+        self.internal_array = board_array[np.newaxis]
+        return self.internal_array
 
     def key(self):
         return self.board.tobytes()
