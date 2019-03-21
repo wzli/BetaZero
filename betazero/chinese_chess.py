@@ -198,30 +198,10 @@ lxqm.lookup_actions.restype = ctypes.c_ubyte
 lxqm.lookup_actions.argtypes = [ctypes.POINTER(Location), ctypes.POINTER(Location), Board, ctypes.c_byte]
 
 
-def get_player(piece):
-    return np.sign(piece)
-
+get_player = np.sign
 
 def is_within_bounds(location):
     return location[0] >= 0 and location[0] < board_size[0] and location[1] >= 0 and location[1] < board_size[1]
-
-
-def is_across_river(player, location):
-    return ((location[0] - (board_size[0] - 1) * 0.5) * player) > 0
-
-
-def is_in_palace(player, location):
-    row, col = location
-    return ((row -
-             (board_size[0] - 1) * 0.5) * player) < -2 and col > 2 and col < 6
-
-
-def is_valid_move(board, player, move):
-    if not is_within_bounds(move):
-        return False
-    if get_player(board[move]) == player:
-        return False
-    return True
 
 
 def get_banned_move(action_history):
@@ -242,114 +222,6 @@ def move_piece(board, location, move):
     return board, reward
 
 
-def pawn_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = [(row + player, col)]
-    if is_across_river(player, location):
-        moves.append((row, col + 1))
-        moves.append((row, col - 1))
-    moves = [move for move in moves if is_valid_move(board, player, move)]
-    return moves
-
-
-def cannon_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = []
-    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        move = (row + d_row, col + d_col)
-        while is_within_bounds(move) and board[move] == EMPTY:
-            moves.append(move)
-            move = (move[0] + d_row, move[1] + d_col)
-        move = (move[0] + d_row, move[1] + d_col)
-        while is_within_bounds(move):
-            if board[move] != EMPTY:
-                if get_player(board[move]) == -player:
-                    moves.append(move)
-                break
-            move = (move[0] + d_row, move[1] + d_col)
-    return moves
-
-
-def rook_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = []
-    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        move = (row + d_row, col + d_col)
-        while is_valid_move(board, player, move):
-            moves.append(move)
-            if board[move] != EMPTY:
-                break
-            move = (move[0] + d_row, move[1] + d_col)
-    return moves
-
-
-def knight_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = []
-    for d_row, d_col in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        if (is_within_bounds((row + d_row, col + d_col))
-                and board[row + d_row, col + d_col] == EMPTY):
-            moves.extend([
-                move for move in (
-                    (row + 2 * d_row + d_col, col + 2 * d_col + d_row),
-                    (row + 2 * d_row - d_col, col + 2 * d_col - d_row),
-                ) if is_valid_move(board, player, move)
-            ])
-    return moves
-
-
-def elephant_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    return [
-        move for move in ((row + 2, col + 2), (row + 2, col - 2),
-                          (row - 2, col + 2), (row - 2, col - 2))
-        if is_valid_move(board, player, move)
-        and not is_across_river(player, move) and board[(move[0] + row) // 2, (
-            move[1] + col) // 2] == EMPTY
-    ]
-
-
-def guard_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    return [
-        move for move in ((row + 1, col + 1), (row + 1, col - 1),
-                          (row - 1, col + 1), (row - 1, col - 1))
-        if is_valid_move(board, player, move) and is_in_palace(player, move)
-    ]
-
-
-def king_moves(board, location):
-    row, col = location
-    player = get_player(board[location])
-    moves = [
-        move for move in ((row, col + 1), (row, col - 1), (row + 1, col),
-                          (row - 1, col))
-        if is_valid_move(board, player, move) and is_in_palace(player, move)
-    ]
-    row += player
-    while is_within_bounds((row, col)):
-        if board[row, col] != EMPTY:
-            if enemy(board[(row, col)]) == board[location]:
-                moves.append((row, col))
-            break
-        row += player
-    return moves
-
-
-def enemy(piece):
-    if piece > 0:
-        piece -= 8
-    elif piece < 0:
-        piece += 8
-    return piece
-
-
 EMPTY = 0
 PAWN = 1
 CANNON = 2
@@ -358,17 +230,7 @@ KNIGHT = 4
 ELEPHANT = 5
 GUARD = 6
 KING = 7
-
-moves_lookup = (
-    None,
-    pawn_moves,
-    cannon_moves,
-    rook_moves,
-    knight_moves,
-    elephant_moves,
-    guard_moves,
-    king_moves,
-)
+N_PIECES = 8
 
 rewards_lookup = (0, 1, 2, 4, 2, 1, 1, 25)
 
@@ -430,7 +292,7 @@ class Session:
         for piece, location in red_spawn:
             self.board[location] = piece
         for piece, location in black_spawn:
-            self.board[location] = enemy(piece)
+            self.board[location] = piece - N_PIECES
         return State(self.board, -self.player, [], 0, 0), 0, 0
 
     def do_action(self, action):
