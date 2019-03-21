@@ -80,14 +80,10 @@ int8_t cannon_moves(Location *moves, const int8_t *board, Location loc) {
          ++i) {
       moves[++n_moves] = translate_location(loc, dir, i, 0);
     }
-    moves[n_moves] = translate_location(loc, dir, i, 0);
-    for (++i; is_within_bounds(moves[n_moves]); ++i) {
-      if (get_player(get_piece(board, moves[n_moves])) == -player) {
-        ++n_moves;
-        break;
-      }
-      moves[n_moves] = translate_location(loc, dir, i, 0);
-    }
+    do {
+        moves[n_moves] = translate_location(loc, dir, i++, 0);
+    } while(is_within_bounds(moves[n_moves]) && get_player(get_piece(board, moves[n_moves])) == EMPTY);
+    n_moves += is_valid_move(board, player, moves[n_moves]);
   }
   return n_moves;
 }
