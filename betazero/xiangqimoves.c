@@ -58,13 +58,13 @@ inline bool is_valid_move(const int8_t *board, int8_t player, Location move) {
 int8_t pawn_moves(Location *moves, const int8_t *board, Location loc) {
   int8_t n_moves = 0;
   int8_t player = get_player(get_piece(board, loc));
-  moves[0] = (Location){loc.row + player, loc.col};
-  n_moves += is_valid_move(board, player, moves[0]);
+  moves[n_moves] = (Location){loc.row + player, loc.col};
+  n_moves += is_valid_move(board, player, moves[n_moves]);
   if (is_across_river(player, loc)) {
-    moves[1] = (Location){loc.row, loc.col + 1};
-    n_moves += is_valid_move(board, player, moves[1]);
-    moves[2] = (Location){loc.row, loc.col - 1};
-    n_moves += is_valid_move(board, player, moves[2]);
+    moves[n_moves] = (Location){loc.row, loc.col + 1};
+    n_moves += is_valid_move(board, player, moves[n_moves]);
+    moves[n_moves] = (Location){loc.row, loc.col - 1};
+    n_moves += is_valid_move(board, player, moves[n_moves]);
   }
   return n_moves;
 }
