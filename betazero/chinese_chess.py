@@ -347,7 +347,7 @@ class State:
                      self.n_turns, self.stalemate_count)
 
     def array(self):
-        if(self.internal_array is not None):
+        if (self.internal_array is not None):
             return self.internal_array
         board_array = np.zeros((8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
@@ -356,11 +356,11 @@ class State:
                     piece) * self.player
         for i in range(
                 lxqm.lookup_actions(locations_buf, moves_buf, self.board, 0)):
-            piece = self.board[moves_buf[i].tup]
-            if (piece != EMPTY):
-                board_array[0, moves_buf[i].row, moves_buf[i]
-                            .col] = rewards_lookup[piece] * get_player(
-                                piece) * self.player
+            threatened_piece = self.board[moves_buf[i].tup]
+            if (threatened_piece != EMPTY):
+                board_array[0, moves_buf[i].row, moves_buf[
+                    i].col] = rewards_lookup[threatened_piece] * -get_player(
+                        threatened_piece) * self.player
         self.internal_array = board_array[np.newaxis]
         return self.internal_array
 
