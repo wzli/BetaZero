@@ -1,10 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum error {
-    SUCCESS = 0, 
-} Error;
-
 typedef enum piece {
     EMPTY = 0,
     PAWN,
@@ -33,13 +29,17 @@ inline Location translate_location(Location loc, int8_t direction, int8_t forwar
             return (Location){loc.row - side_steps, loc.col + forward_steps};
     }
 }
+
+inline int8_t enemy(int8_t piece) {
+    return piece ^ 0xF8;
+}
  
 inline int8_t get_piece(const int8_t* board, Location loc) {
     return board[loc.col + (loc.row * 9)];
 }
 
 inline int8_t get_player(int8_t piece) {
-    return piece < 0 ? -1 : piece & 1;
+    return (piece >> 7) + (piece > 0);
 }
 
 inline bool is_within_bounds(Location loc) {
@@ -163,13 +163,13 @@ int8_t king_moves(Location* moves, const int8_t* board, Location loc) {
     for(i = 2; is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == EMPTY; ++i) {
         moves[n_moves] = (Location){loc.row + (i * player), loc.col};
     }
-    n_moves += is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) * player == -KING;
+    n_moves += is_within_bounds(moves[n_moves]) && get_piece(board, moves[n_moves]) == enemy(get_piece(board, loc));
     return n_moves;
 }
 
-int8_t piece_moves(Location* moves, const int8_t* board, Location loc) {
+int8_t lookup_moves(Location* moves, const int8_t* board, Location loc) {
     int8_t piece = get_piece(board, loc);
-    switch (piece < 0 ? -piece : piece) {
+    switch (piece & 0x7) {
         case PAWN:
             return pawn_moves(moves, board, loc);
         case CANNON:
@@ -189,6 +189,24 @@ int8_t piece_moves(Location* moves, const int8_t* board, Location loc) {
     }
 }
 
+int16_t lookup_actions(Location* locations, Location* moves, const int8_t* board, int8_t player) {
+    int16_t n_actions = 0;
+    int8_t i, j, k;
+    for(i = 0; i < 10; ++i) {
+        for(j = 0; j < 9; ++j) {
+            locations[n_actions] = (Location) {i, j};
+            if(!player || get_player(get_piece(board, locations[n_actions])) == player) {
+                int8_t n_moves = lookup_moves(moves + n_actions, board, locations[n_actions]);
+                for(k = 0; k < n_moves; ++k) {
+                    locations[n_actions + k] = locations[n_actions];
+                }
+                n_actions += n_moves;
+            }
+        }
+    }
+    return n_actions;
+}
+
 /*
 
 def get_banned_move(move_history):
@@ -206,7 +224,6 @@ def move_piece(board, location, move):
     board[move] = board[location]
     board[location] = EMPTY
     return board, reward
-*/
 
 #include <stdio.h>
 
@@ -220,14 +237,15 @@ int main() {
     board[3] = -1;
     board[6] = -1;
     //board[4+9*2] = 1;
-    board[4+9*9] = -KING;
+    board[4+9*9] = enemy(KING);
     Location moves[100];
 
     board[4] = KING;
-    n_moves = piece_moves(moves, board, (Location){0,4});
+    n_moves = lookup_moves(moves, board, (Location){0,4});
  
     for(i = 0; i < n_moves; ++i) {
         printf("(%d,%d)\r\n", moves[i].row, moves[i].col);
     }
     return 0;
 }
+*/
