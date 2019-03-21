@@ -189,8 +189,8 @@ int8_t lookup_moves(Location* moves, const int8_t* board, Location loc) {
     }
 }
 
-int16_t lookup_actions(Location* locations, Location* moves, const int8_t* board, int8_t player) {
-    int16_t n_actions = 0;
+uint8_t lookup_actions(Location* locations, Location* moves, const int8_t* board, int8_t player) {
+    uint8_t n_actions = 0;
     int8_t i, j, k;
     for(i = 0; i < 10; ++i) {
         for(j = 0; j < 9; ++j) {
@@ -206,46 +206,3 @@ int16_t lookup_actions(Location* locations, Location* moves, const int8_t* board
     }
     return n_actions;
 }
-
-/*
-
-def get_banned_move(move_history):
-    if len(move_history) < 3:
-        return None
-    opponent_location, opponent_move = move_history[-1]
-    if (opponent_move, opponent_location) == move_history[-3]:
-        move, location = move_history[-2]
-        return (location, move)
-
-
-def move_piece(board, location, move):
-    board = np.copy(board)
-    reward = rewards_lookup[board[move]]
-    board[move] = board[location]
-    board[location] = EMPTY
-    return board, reward
-
-#include <stdio.h>
-
-int main() {
-    int8_t board[90];
-    int8_t i = 0;
-    int8_t n_moves;
-    for(i = 0; i < 90; ++i) {
-        board[i] = 0;
-    }
-    board[3] = -1;
-    board[6] = -1;
-    //board[4+9*2] = 1;
-    board[4+9*9] = enemy(KING);
-    Location moves[100];
-
-    board[4] = KING;
-    n_moves = lookup_moves(moves, board, (Location){0,4});
- 
-    for(i = 0; i < n_moves; ++i) {
-        printf("(%d,%d)\r\n", moves[i].row, moves[i].col);
-    }
-    return 0;
-}
-*/

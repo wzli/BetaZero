@@ -1,6 +1,7 @@
 import numpy as np
 from .utils import parse_grid_input
 
+
 board_size = (10, 9)
 max_value = 25
 min_max = True
@@ -168,6 +169,33 @@ def ValueModelMNV2():
     model = Model(inputs, outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adam')
     return model
+
+
+# setup C lib xiangqimoves
+import ctypes, os
+
+class Location(ctypes.Structure):
+    _fields_= [('row', ctypes.c_byte), ('col', ctypes.c_byte)]
+
+    @property
+    def tup(self):
+        return self.row, self.col
+
+Board = np.ctypeslib.ndpointer(
+    dtype = np.int8,
+    ndim = 2,
+    shape = board_size,
+    flags = ['C_CONTIGUOUS', 'ALIGNED']
+)
+
+locations_buf = (Location * 256)()
+moves_buf = (Location * 256)()
+
+lxqm = np.ctypeslib.load_library("libxiangqimoves", os.path.dirname(__file__))
+lxqm.lookup_moves.restype = ctypes.c_byte
+lxqm.lookup_moves.argtypes = [ctypes.POINTER(Location), Board, Location]
+lxqm.lookup_actions.restype = ctypes.c_ubyte
+lxqm.lookup_actions.argtypes = [ctypes.POINTER(Location), ctypes.POINTER(Location), Board, ctypes.c_byte]
 
 
 def get_player(piece):
@@ -409,8 +437,7 @@ class Session:
         location, move = action
         if (not location or not move or not is_within_bounds(location)
                 or get_player(self.board[location]) != self.player
-                or move not in moves_lookup[self.board[location]](self.board,
-                                                                  location)
+                or move not in (moves_buf[i].tup for i in range(lxqm.lookup_moves(moves_buf, self.board, Location(*location))))
                 or (self.stalemate_count > 2
                     and action == get_banned_move(self.action_history))):
             return State(self.board, self.player, self.action_history[-4:],
@@ -458,13 +485,12 @@ class State:
         board_array = np.zeros((8, *board_size), dtype=np.int8)
         for location, piece in np.ndenumerate(self.board):
             if piece != EMPTY:
-                piece_player = get_player(piece)
                 board_array[piece, location[0], location[
-                    1]] = piece_player * self.player
-                for move in moves_lookup[piece](self.board, location):
-                    if self.board[move] != EMPTY:
-                        board_array[0, move[0], move[1]] = rewards_lookup[
-                            self.board[move]] * piece_player * self.player
+                    1]] = get_player(piece) * self.player
+        for i in range(lxqm.lookup_actions(locations_buf, moves_buf, self.board, 0)):
+            piece = self.board[moves_buf[i].tup]
+            if(piece != EMPTY):
+                board_array[0, moves_buf[i].row, moves_buf[i].col] = rewards_lookup[piece] * get_player(piece) * self.player
         return board_array[np.newaxis]
 
     def key(self):
@@ -482,11 +508,9 @@ def get_actions(state):
     """Returns the list of all valid actions given a game state."""
     banned_move = get_banned_move(
         state.action_history) if state.stalemate_count > 2 else None
-    return [(location, move)
-            for location, piece in np.ndenumerate(state.board)
-            if get_player(piece) == state.player
-            for move in moves_lookup[piece](state.board, location)
-            if (location, move) != banned_move]
+    n_actions = lxqm.lookup_actions(locations_buf, moves_buf, state.board, state.player)
+    actions = [(locations_buf[i].tup, moves_buf[i].tup) for i in range(n_actions) if (locations_buf[i].tup, moves_buf[i].tup) != banned_move]
+    return actions
 
 
 def predict_action(state, action):
