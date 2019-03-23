@@ -241,6 +241,7 @@ class StoneGroup:
         self.stones = stones if stones else set()
         self.liberties = liberties if liberties else set()
 
+    # make a copy of the group, and update the lookup to point to new group
     def copy(self, group_lookup=None, modified_groups=None):
         group = StoneGroup(self.stones.copy(), self.liberties.copy())
         if group_lookup is not None:
@@ -265,17 +266,18 @@ class StoneGroup:
                 group_lookup[stone] = self
 
 
-# core go engine
+# core go engine, pass in session if you care about keeping track of the ko
+# and the empty spots, which is useful for generating actions for a given state
+# in the running session
 def place_stone(stone, perspective, board, group_lookup, session=None):
     # create stone group with a single stone
     group = StoneGroup({stone})
     if session:
         session.ko = None
         session.empty_spots.remove(stone)
-    else:
-        modified_groups = {group}
-        board = np.copy(board)
-        group_lookup = np.copy(group_lookup)
+    modified_groups = {group}
+    board = np.copy(board)
+    group_lookup = np.copy(group_lookup)
     group_lookup[stone] = group
     board[stone] = perspective
     captured_group = None
@@ -285,7 +287,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
         if board[adjacent_spot] == -perspective:
             # look up enemy group
             enemy_group = group_lookup[adjacent_spot]
-            if not session and enemy_group not in modified_groups:
+            if enemy_group not in modified_groups:
                 enemy_group = enemy_group.copy(group_lookup, modified_groups)
             # remove a liberty from their stone group
             enemy_group.liberties.discard(stone)
@@ -306,7 +308,7 @@ def place_stone(stone, perspective, board, group_lookup, session=None):
                     for released in get_adjacent(captured):
                         if board[released] == perspective:
                             released_group = group_lookup[released]
-                            if not session and released_group not in modified_groups:
+                            if released_group not in modified_groups:
                                 released_group = released_group.copy(
                                     group_lookup, modified_groups)
                             released_group.liberties.add(captured)
@@ -339,8 +341,7 @@ class Session:
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, -self.perspective, np.zeros(board_size),
-                           np.zeros(board_size))
+        self.state = State(self, -self.perspective, self.board, self.group_lookup)
         return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
@@ -366,6 +367,8 @@ class Session:
                 self.turn_pass = False
                 board, group_lookup, captured_group = place_stone(
                     action, perspective, board, group_lookup, self)
+                self.board = board
+                self.group_lookup = group_lookup
             elif self.turn_pass:
                 reset = self.n_turns
                 self.reset()
@@ -376,20 +379,16 @@ class Session:
             if self.n_turns > max_turns:
                 reset = self.n_turns
                 self.reset()
+            self.state = State(self, self.perspective, board, group_lookup)
         else:
             if action:
                 board, group_lookup, captured_group = place_stone(
                     action, perspective, board, group_lookup)
             elif self.turn_pass:
                 reset = self.n_turns + 1
-        liberty_map = generate_liberty_map(board, group_lookup)
-        territory_map = generate_territory_map(board)
-        state = State(self, perspective, liberty_map, territory_map)
-        if mutable:
-            self.state = State(self, self.perspective, liberty_map,
-                               territory_map)
+        state = State(self, perspective, board, group_lookup)
         if reset > 1:
-            reward = np.sum(territory_map) * perspective
+            reward = np.sum(state.territory_map) * perspective
         elif reset == 0 and captured_group:
             reward = len(captured_group.stones)
         return state, reward, reset
@@ -459,15 +458,28 @@ def predict_action(state, action):
 
 
 class State:
-    def __init__(self, session, perspective, liberty_map, territory_map):
+    def __init__(self, session, perspective, board, group_lookup):
         self.session = session
         self.perspective = perspective
-        self.liberty_map = liberty_map
-        self.territory_map = territory_map
+        self.board = board
+        self.group_lookup = group_lookup
+        self.internal_territory_map = None
+        self.internal_liberty_map = None
 
     def flip(self):
-        return State(self.session, -self.perspective, self.liberty_map,
-                     self.perspective)
+        return State(self.session, -self.perspective, self.board, self.group_lookup)
+
+    @property
+    def territory_map(self):
+        if self.internal_territory_map is None:
+            self.internal_territory_map = generate_territory_map(self.board)
+        return self.internal_territory_map
+
+    @property
+    def liberty_map(self):
+        if self.internal_liberty_map is None:
+            self.internal_liberty_map = generate_liberty_map(self.board, self.group_lookup)
+        return self.internal_liberty_map
 
     def array(self):
         return np.array([
