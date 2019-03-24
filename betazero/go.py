@@ -334,20 +334,18 @@ class Session:
         self.reset()
 
     def reset(self):
-        self.perspective = 1
         self.empty_spots = {(row, col) for row in range(board_size[0]) for col in range(board_size[1])}
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, -self.perspective, np.zeros(board_size, dtype=np.int8), np.empty(board_size, dtype=object))
+        self.state = State(self, 1, np.zeros(board_size, dtype=np.int8), np.empty(board_size, dtype=object))
         return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
     # otherwise min max tree won't work
     def do_action(self, action, mutable=True):
-        # returns in the perspective of the action taker
-        perspective = self.perspective
         # default values if nothing happens
+        perspective = self.state.perspective
         board = self.state.board
         group_lookup = self.state.group_lookup
         captured_group = None
@@ -359,7 +357,6 @@ class Session:
             reset = 1
         elif mutable:
             self.n_turns += 1
-            self.perspective *= -1
             # end the game after a turn limit
             if self.n_turns > max_turns:
                 reset = self.n_turns
@@ -369,7 +366,7 @@ class Session:
                 self.turn_pass = False
                 board, group_lookup, captured_group = place_stone(
                     action, perspective, board, group_lookup, self)
-                self.state = State(self, self.perspective, board, group_lookup)
+                self.state = State(self, -perspective, board, group_lookup)
             elif self.turn_pass:
                 reset = self.n_turns
                 self.reset()
@@ -383,6 +380,7 @@ class Session:
                     action, perspective, board, group_lookup)
             elif self.turn_pass:
                 reset = self.n_turns + 1
+        # returns state in the perspective of the action taker
         state = State(self, perspective, board, group_lookup)
         if reset > 1:
             reward = np.sum(state.territory_map) * perspective
@@ -423,7 +421,7 @@ class Session:
         print_groups(self.state.group_lookup)
         print(ascii_board(self.state.board))
         print("turn", self.n_turns)
-        if self.perspective > 0:
+        if self.state.perspective > 0:
             print("X move")
         else:
             print("O move")
