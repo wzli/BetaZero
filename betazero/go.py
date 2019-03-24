@@ -335,13 +335,11 @@ class Session:
 
     def reset(self):
         self.perspective = 1
-        self.board = np.zeros(board_size, dtype=np.int8)
-        self.group_lookup = np.empty(board_size, dtype=object)
-        self.empty_spots = {index for index, _ in np.ndenumerate(self.board)}
+        self.empty_spots = {(row, col) for row in range(board_size[0]) for col in range(board_size[1])}
         self.turn_pass = False
         self.ko = None
         self.n_turns = 0
-        self.state = State(self, -self.perspective, self.board, self.group_lookup)
+        self.state = State(self, -self.perspective, np.zeros(board_size, dtype=np.int8), np.empty(board_size, dtype=object))
         return self.state, 0, 0
 
     # this function enforces swaping perspectives each turn
@@ -350,8 +348,8 @@ class Session:
         # returns in the perspective of the action taker
         perspective = self.perspective
         # default values if nothing happens
-        board = self.board
-        group_lookup = self.group_lookup
+        board = self.state.board
+        group_lookup = self.state.group_lookup
         captured_group = None
         reward = 0
         reset = 0
@@ -367,8 +365,6 @@ class Session:
                 self.turn_pass = False
                 board, group_lookup, captured_group = place_stone(
                     action, perspective, board, group_lookup, self)
-                self.board = board
-                self.group_lookup = group_lookup
             elif self.turn_pass:
                 reset = self.n_turns
                 self.reset()
@@ -397,15 +393,15 @@ class Session:
         # iterate adjacent.stones
         for adjacent_spot in get_adjacent(stone):
             # creates liberty, not suicide
-            if self.board[adjacent_spot] == 0:
+            if self.state.board[adjacent_spot] == 0:
                 return False
             # if any adjacent friendly group has more than one liberty, not suicide
-            if (self.board[adjacent_spot] == perspective
-                    and len(self.group_lookup[adjacent_spot].liberties) > 1):
+            if (self.state.board[adjacent_spot] == perspective
+                    and len(self.state.group_lookup[adjacent_spot].liberties) > 1):
                 return False
             # if any adjacent enemy group can be captured, not suicide
-            if (self.board[adjacent_spot] == -perspective
-                    and len(self.group_lookup[adjacent_spot].liberties) == 1):
+            if (self.state.board[adjacent_spot] == -perspective
+                    and len(self.state.group_lookup[adjacent_spot].liberties) == 1):
                 return False
         # fails checks, is suicide
         return True
@@ -416,15 +412,15 @@ class Session:
             return False
         # out of bounds, already occupied, ko, or suicidal moves
         if (stone[0] < 0 or stone[0] > board_size[0] or stone[1] < 0
-                or stone[1] > board_size[1] or self.board[stone] != 0
+                or stone[1] > board_size[1] or self.state.board[stone] != 0
                 or stone == self.ko or self.is_suicide(stone, perspective)):
             return True
         else:
             return False
 
     def print_status(self):
-        print_groups(self.group_lookup)
-        print(ascii_board(self.board))
+        print_groups(self.state.group_lookup)
+        print(ascii_board(self.state.board))
         print("turn", self.n_turns)
         if self.perspective > 0:
             print("X move")
