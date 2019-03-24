@@ -360,22 +360,23 @@ class Session:
         elif mutable:
             self.n_turns += 1
             self.perspective *= -1
+            # end the game after a turn limit
+            if self.n_turns > max_turns:
+                reset = self.n_turns
+                self.reset()
             # end of game when both players pass
-            if action:
+            elif action:
                 self.turn_pass = False
                 board, group_lookup, captured_group = place_stone(
                     action, perspective, board, group_lookup, self)
+                self.state = State(self, self.perspective, board, group_lookup)
             elif self.turn_pass:
                 reset = self.n_turns
                 self.reset()
             else:
                 self.turn_pass = True
                 self.ko = None
-            # end the game after a turn limit
-            if self.n_turns > max_turns:
-                reset = self.n_turns
-                self.reset()
-            self.state = State(self, self.perspective, board, group_lookup)
+                self.state = self.state.flip()
         else:
             if action:
                 board, group_lookup, captured_group = place_stone(
