@@ -55,6 +55,13 @@ def fetch_remote_models(url, timeout):
     return filter_model_names(parser.links)
 
 
+def delete_models(directory, models):
+    for model in models:
+        model_file = "model_" + str(model) + ".h5"
+        file_path = os.path.join(directory, model_file)
+        os.remove(file_path)
+
+
 def download_models(url, directory, models, timeout):
     for model in models:
         model_file = "model_" + str(model) + ".h5"
@@ -87,14 +94,22 @@ if __name__ == '__main__':
         default='.',
         help='directory containing models_[ts].h5 files')
     parser.add_argument('-f', "--record-file", help='path to the record file')
+    parser.add_argument(
+        '-rm',
+        "--remove",
+        help='delete eliminated models')
     args = parser.parse_args()
 
     eliminated_models = fetch_eliminated_models(args.record_file)
     local_models = fetch_local_models(args.model_directory)
     remote_models = fetch_remote_models(args.remote_url, args.timeout)
     new_models = remote_models - local_models - eliminated_models
-    print("eliminated models:", sorted(eliminated_models))
-    print("local models:", sorted(local_models))
+    #print("eliminated models:", sorted(eliminated_models))
+    #print("local models:", sorted(local_models))
+    if(args.remove):
+        purge_models = local_models - eliminated_models
+        print("purge models:", sorted(purge_models))
+        delete_models(directory, purge_models)
     print("remote models:", sorted(remote_models))
     print("new models:", sorted(new_models))
     download_models(args.remote_url, args.model_directory, new_models,
