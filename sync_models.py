@@ -97,6 +97,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-rm',
         "--remove",
+        action='store_true',
         help='delete eliminated models')
     args = parser.parse_args()
 
