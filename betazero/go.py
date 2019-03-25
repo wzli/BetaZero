@@ -339,7 +339,8 @@ class Session:
         self.ko = None
         self.n_turns = 0
         self.state = State(self, 1, np.zeros(board_size, dtype=np.int8), np.empty(board_size, dtype=object))
-        return self.state, 0, 0
+        # internal state is in opposite perspective, since it's the next players turn after an action
+        return self.state.flip(), 0, 0
 
     # this function enforces swaping perspectives each turn
     # otherwise min max tree won't work
