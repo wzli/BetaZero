@@ -110,7 +110,7 @@ if __name__ == '__main__':
     if(args.remove):
         purge_models = local_models - eliminated_models
         print("purge models:", sorted(purge_models))
-        delete_models(directory, purge_models)
+        delete_models(args.model_directory, purge_models)
     print("remote models:", sorted(remote_models))
     print("new models:", sorted(new_models))
     download_models(args.remote_url, args.model_directory, new_models,
