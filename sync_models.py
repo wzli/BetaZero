@@ -71,7 +71,6 @@ def download_models(url, directory, models, timeout):
             response = urlopen(file_url, timeout=timeout)
             with open(os.path.join(directory, model_file), 'wb') as f:
                 f.write(response.read())
-            break
         except URLError as e:
             print(e)
 
