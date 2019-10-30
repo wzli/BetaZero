@@ -80,9 +80,8 @@ def predict_action(state, action):
     """Returns a tuple consisting of (state_transition, reward, reset_count)."""
     # make buffer
     state_transition = np.copy(state.board)
-    action = tuple(action)
     # invalid action
-    if state_transition[action] != 0:
+    if not action or state_transition[action] != 0:
         return State(state_transition), -1, 1
     # apply action
     state_transition[action] = 1
